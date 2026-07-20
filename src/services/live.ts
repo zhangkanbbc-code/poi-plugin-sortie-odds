@@ -90,5 +90,16 @@ export const deriveLiveSortie = (
   const actualEdges = (sortie?.spotHistory ?? [])
     .slice(1)
     .filter((edge) => Number.isFinite(edge) && edge > 0)
-  return { ...base, active: true, mapId, actualEdges }
+  return {
+    ...base,
+    active: true,
+    mapId,
+    actualEdges,
+    // 能走到第 N 个节点说明前 N-1 个节点必然已结算——不依赖事件记账的下界；
+    // 自有记账（当前点结算后 = N）更新时取更大值
+    completedEdgeCount: Math.max(
+      base.completedEdgeCount,
+      Math.max(0, actualEdges.length - 1),
+    ),
+  }
 }

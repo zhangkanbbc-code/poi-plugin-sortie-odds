@@ -102,6 +102,26 @@ describe('deriveLiveSortie', () => {
     expect(live.settlementAt).toBe(123)
   })
 
+  it('已完成节点数按"能走到第 N 点说明前 N-1 点已结算"派生', () => {
+    // 自有结算记账失效（=0）时也能正确排除已打完的节点
+    const live = deriveLiveSortie(initialState, {
+      sortieMapId: '15',
+      sortieStatus: [true, false, false, false],
+      spotHistory: [0, 3, 7, 12],
+    })
+    expect(live.completedEdgeCount).toBe(2)
+  })
+
+  it('自有结算记账更新（当前点已结算）时以更大值为准', () => {
+    const own = { ...initialState, completedEdgeCount: 3 }
+    const live = deriveLiveSortie(own, {
+      sortieMapId: '15',
+      sortieStatus: [true, false, false, false],
+      spotHistory: [0, 3, 7, 12],
+    })
+    expect(live.completedEdgeCount).toBe(3)
+  })
+
   it('spotHistory 首位是起点格，会被剔除；0 值边被过滤', () => {
     const live = deriveLiveSortie(initialState, {
       sortieMapId: '25',
