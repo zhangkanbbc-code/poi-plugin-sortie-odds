@@ -65,6 +65,15 @@
 在 poi 设置 → 插件 → 安装本地插件包 中选择该文件即可。
 建议同时安装 poi-plugin-prophet（未卜先知）与 poi-plugin-akashic-records（航海日志）以启用联动。
 
+## 活动新敌人数据
+
+模拟器数据（`engine/vendor/`）来自 KC3 kancolle-replay，随插件版本固定。
+每期活动的新深海舰（尤其陆基类）需等上游收录后同步——运行
+`npx tsx scripts/update-vendor.ts` 一键更新到上游最新。遇到
+「Unknown ship: XXXX, stats required」报错即表示该敌尚未收录；
+插件在此情况下选择明确报错而非用错误模型硬算（缺陆基分类的敌人
+会被误算为可被鱼雷命中的水面舰，高估胜率）。
+
 ## 开发
 
 ```powershell

@@ -666,7 +666,11 @@ const SortieOddsView: React.FC<StateProps> = ({
       setProgress(1)
     } catch (cause) {
       if (generation === runGeneration.current) {
-        setError(`分析失败：${cause instanceof Error ? cause.message : String(cause)}`)
+        const message = cause instanceof Error ? cause.message : String(cause)
+        setError(/Unknown ship.*stats required/i.test(message)
+          ? `分析失败：${message} —— 这是活动新敌人，模拟器数据尚未收录；`
+            + '待上游（KC3 kancolle-replay）跟进后更新 vendor 数据即可，通常在活动开放后数日内'
+          : `分析失败：${message}`)
       }
     } finally {
       if (generation === runGeneration.current) setRunning(false)
