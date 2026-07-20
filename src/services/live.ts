@@ -46,6 +46,13 @@ export const readEventMapInfo = (
   }
 }
 
+// poi 的 sortie.combinedFlag 表示"家里是否编着联合舰队"，不代表本次出击形态：
+// 联合在家时单独出第三舰队，flag 仍是 1。以实际出击舰队数为准
+export const effectiveCombinedFlag = (
+  fleetIds: number[],
+  combinedFlag: number,
+): number => (fleetIds.length > 1 ? combinedFlag : 0)
+
 // 斩杀线各图不同且不可读，用 35% 作为保守分界：
 // 血量偏低 → 取 [0, 当前血量] 的样本（斩杀形态为主）；
 // 血量充足 → 取 [当前血量, 满血]（通常形态）

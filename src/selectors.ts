@@ -6,6 +6,7 @@ import {
 
 import { toPlayerFleet } from './services/adapter'
 import { detectSupportMissions } from './services/lbas'
+import { effectiveCombinedFlag } from './services/live'
 import type {
   PoiEquipEntry,
   PoiFleetSnapshot,
@@ -68,7 +69,10 @@ export const selectCurrentFleet = (state: PoiRootState): PoiFleetSnapshot => {
     fleetIds,
     fleets,
     equips,
-    combinedFlag: Number(state.sortie?.combinedFlag ?? 0),
+    combinedFlag: effectiveCombinedFlag(
+      fleetIds,
+      Number(state.sortie?.combinedFlag ?? 0),
+    ),
     speed,
     hqLevel,
     los,

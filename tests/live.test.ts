@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { initialState } from '../src/redux'
 import {
   deriveLiveSortie,
+  effectiveCombinedFlag,
   gaugeBandFor,
   parseSortieMapId,
   readEventMapInfo,
@@ -53,6 +54,18 @@ describe('readEventMapInfo', () => {
     expect(readEventMapInfo(maps, '1-5')).toBeNull()
     expect(readEventMapInfo(maps, '55-3')).toBeNull()
     expect(readEventMapInfo(undefined, '48-1')).toBeNull()
+  })
+})
+
+describe('effectiveCombinedFlag', () => {
+  it('单舰队出击时忽略家里的联合编队标记', () => {
+    // 家里 1+2 编着机动部队(flag=1)，但实际出的是第三舰队单队
+    expect(effectiveCombinedFlag([2], 1)).toBe(0)
+  })
+
+  it('联合出击时保留联合类型', () => {
+    expect(effectiveCombinedFlag([0, 1], 1)).toBe(1)
+    expect(effectiveCombinedFlag([0, 1], 3)).toBe(3)
   })
 })
 
