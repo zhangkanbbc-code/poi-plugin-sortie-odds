@@ -67,6 +67,7 @@ import {
   pickAutoTarget,
   rankRoutesByTraffic,
   routeLabel,
+  routeNodeSequence,
 } from '../services/route'
 import { simulatorBridge } from '../services/simulator'
 import { summarizeEngineWarnings } from '../services/warnings'
@@ -297,6 +298,13 @@ const SortieOddsView: React.FC<StateProps> = ({
   const gaugeBand = isEventMap && gaugeMode === 'auto' ? gaugeBandFor(autoEvent) : null
   const runBusyRef = useRef(false)
   const runPendingRef = useRef<'auto' | 'manual' | null>(null)
+  // 最近一次完成的分析基于什么状态（跟随诊断用）
+  const [runBasis, setRunBasis] = useState<{
+    at: number
+    edges: string
+    nodes: string
+    samples: number
+  } | null>(null)
   const evidenceGeneration = useRef(0)
   const [gimmicks, setGimmicks] = useState<KcnavGimmicksPayload | null>(null)
   const [gimmickOpen, setGimmickOpen] = usePersistentState('gimmickOpen', false)
@@ -566,6 +574,19 @@ const SortieOddsView: React.FC<StateProps> = ({
     () => (mapData ? getBattleEdges(mapData, remainingRoute) : []),
     [mapData, remainingRoute],
   )
+  // 实战中把路线拆成 已走(灰)/当前位置(◆)/剩余 三段展示；
+  // 仅当实际路径确为所选路线前缀时可用（末条边不在 KCNav 拓扑时会失配）
+  const routeProgress = useMemo(() => {
+    if (!mapData || !live.active || live.mapId !== mapId) return null
+    if (actualEdges.length === 0 || effectiveRoute.length < actualEdges.length) return null
+    if (actualEdges.some((edge, index) => effectiveRoute[index] !== edge)) return null
+    const nodes = routeNodeSequence(mapData, effectiveRoute)
+    return {
+      walked: nodes.slice(0, actualEdges.length),
+      current: nodes[actualEdges.length],
+      remaining: nodes.slice(actualEdges.length + 1),
+    }
+  }, [actualEdgesKey, effectiveRouteKey, live.active, live.mapId, mapData, mapId])
   const waitingForChoice = !!mapData && live.active && isWaitingAtChoice(mapData, actualEdges)
   const smokeCount = useMemo(() => countSmokeGenerators(snapshot), [snapshot])
 
@@ -703,6 +724,12 @@ const SortieOddsView: React.FC<StateProps> = ({
       )
       const result = await simulatorBridge.run(input, (value) => setProgress(value))
       setRunResult(result)
+      setRunBasis({
+        at: Date.now(),
+        edges: actualEdges.join(','),
+        nodes: battleEdges.map((edge) => edge.to).join('→'),
+        samples: trigger === 'auto' ? Math.min(samples, 2000) : samples,
+      })
       setProgress(1)
     } catch (cause) {
       const message = cause instanceof Error ? cause.message : String(cause)
@@ -864,7 +891,29 @@ const SortieOddsView: React.FC<StateProps> = ({
               ? '实战状态自动跟随中'
               : '计划分析'}
         </Tag>
-        <span>{mapData && effectiveRoute.length ? routeLabel(mapData, effectiveRoute) : '尚无可达路线'}</span>
+        <span>
+          {routeProgress ? (
+            <>
+              {routeProgress.walked.length > 0 && (
+                <span className="sortie-odds__muted">
+                  {routeProgress.walked.join(' → ')}
+                  {' → '}
+                </span>
+              )}
+              <strong>◆{routeProgress.current}</strong>
+              {routeProgress.remaining.length > 0 && ` → ${routeProgress.remaining.join(' → ')}`}
+            </>
+          ) : (
+            mapData && effectiveRoute.length ? routeLabel(mapData, effectiveRoute) : '尚无可达路线'
+          )}
+        </span>
+        {routeProgress && (
+          <span className="sortie-odds__muted">
+            {battleEdges.length > 0
+              ? `模拟剩余 ${battleEdges.length} 战：${battleEdges.map((edge) => edge.to).join('、')}`
+              : '已到目标点'}
+          </span>
+        )}
         <span className="sortie-odds__muted">
           当前读取 {fleetShipCount(snapshot)} 艘舰 · {snapshot.combinedFlag ? '联合舰队' : '通常舰队'}
         </span>
@@ -1210,6 +1259,14 @@ const SortieOddsView: React.FC<StateProps> = ({
               <div className="sortie-odds__metric-label">抵达后 S / A+</div>
             </Card>
           </div>
+
+          {runBasis && (
+            <div className="sortie-odds__muted" style={{ margin: '0 0 10px' }}>
+              本次结果：{new Date(runBasis.at).toLocaleTimeString()} 模拟
+              {runBasis.nodes ? ` ${runBasis.nodes}` : ''} · {runBasis.samples} 抽
+              {running && ' ｜ 正在按最新位置重算…'}
+            </div>
+          )}
 
           {isEventMap && autoEvent && total > 0
             && (runResult.result.totalTransport ?? 0) > 0

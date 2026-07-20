@@ -99,15 +99,18 @@ export const buildRouteChoices = (
   return all
 }
 
-export const routeLabel = (map: KcnavMapPayload, edgeIds: number[]): string => {
+export const routeNodeSequence = (map: KcnavMapPayload, edgeIds: number[]): string[] => {
   const edgeMap = getEdgeMap(map)
   const nodes = [edgeMap.get(edgeIds[0] ?? -1)?.from ?? getStartNodes(map)[0]]
   for (const edgeId of edgeIds) {
     const edge = edgeMap.get(edgeId)
     if (edge) nodes.push(edge.to)
   }
-  return nodes.join(' → ')
+  return nodes
 }
+
+export const routeLabel = (map: KcnavMapPayload, edgeIds: number[]): string =>
+  routeNodeSequence(map, edgeIds).join(' → ')
 
 export const getTargetOptions = (map: KcnavMapPayload): RouteEdge[] => {
   const byNode = new Map<string, RouteEdge>()
