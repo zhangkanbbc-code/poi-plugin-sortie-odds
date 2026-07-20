@@ -202,3 +202,45 @@ export const isWaitingAtChoice = (
   const edge = getEdgeMap(map).get(actualEdges.at(-1) ?? -1)
   return edge?.nodeType === NODE_TYPE.Choice
 }
+
+export interface SupplyTier {
+  // 展示标签（不含百分比，百分比另行拼接以便复用）
+  label: string
+  // 相对"普通战斗"（=100%）的燃料/弹药消耗比例；数值取自 vendor 模拟器
+  // engine/vendor/kcsim.js updateSupply() 的 newSupply 分支实测常量：
+  // 普通 20%/20%、夜战 10%/10%、空袭 6%/4%（对应 30%/20%），
+  // 均为 100% 战斗对应值的相对折算
+  fuelPercent: number
+  ammoPercent: number
+  // 该档位是否只是"通常如此"而非引擎按节点类型强制（对潜点的免弹药实际由
+  // 敌方是否为纯潜艇编成决定，不是节点类型本身——地图设计上对潜点几乎总是
+  // 纯潜编成，但严格来说要看真实敌情）
+  approximate?: boolean
+}
+
+const SUPPLY_TIER_NORMAL: SupplyTier = { label: '满额', fuelPercent: 100, ammoPercent: 100 }
+const SUPPLY_TIER_NIGHT: SupplyTier = { label: '夜战·半额', fuelPercent: 50, ammoPercent: 50 }
+const SUPPLY_TIER_AIR_RAID: SupplyTier = { label: '空袭·少量', fuelPercent: 30, ammoPercent: 20 }
+const SUPPLY_TIER_SUB: SupplyTier = {
+  label: '对潜·通常免弹药',
+  fuelPercent: 40,
+  ammoPercent: 0,
+  approximate: true,
+}
+
+// 道中各类节点的油弹消耗档位，供玩家判断是否需要携带洋上补给（大发/给油给弹装置）。
+// 只按节点类型区分——"航空战"(AirBattle) 与普通战斗一样按满额算：
+// 引擎里只有 AirRaid（被空袭，无法还手）才会触发消耗折减，AirBattle 是正常战斗
+// 只是双方以航空兵力交战，船只并未省下补给（这一点与"空袭"是两回事，容易搞混）
+export const supplyTier = (nodeType: number): SupplyTier => {
+  switch (nodeType) {
+    case NODE_TYPE.NightBattle:
+      return SUPPLY_TIER_NIGHT
+    case NODE_TYPE.AirRaid:
+      return SUPPLY_TIER_AIR_RAID
+    case NODE_TYPE.SubStrike:
+      return SUPPLY_TIER_SUB
+    default:
+      return SUPPLY_TIER_NORMAL
+  }
+}

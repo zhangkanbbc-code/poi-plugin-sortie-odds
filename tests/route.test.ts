@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
+import { NODE_TYPE } from '../src/constants'
 import {
   buildRouteChoices,
   enumeratePaths,
@@ -8,6 +9,7 @@ import {
   pickAutoTarget,
   rankRoutesByTraffic,
   routeLabel,
+  supplyTier,
 } from '../src/services/route'
 import type { KcnavMapPayload } from '../src/types'
 
@@ -220,5 +222,42 @@ describe('rankRoutesByTraffic', () => {
       [1, 4, 5, 11],
       [1, 4, 5, 3, 10],
     ])
+  })
+})
+
+describe('supplyTier', () => {
+  // 百分比取自 vendor 模拟器 engine/vendor/kcsim.js updateSupply()
+  // 的 newSupply 分支实测常量，换算成相对普通战斗（20%/20%）的百分比
+  it('普通战斗/BOSS/航空战等默认按满额算', () => {
+    expect(supplyTier(NODE_TYPE.Battle)).toEqual({ label: '满额', fuelPercent: 100, ammoPercent: 100 })
+    expect(supplyTier(NODE_TYPE.Boss).fuelPercent).toBe(100)
+    // 航空战不是"空袭"——引擎里只有 AirRaid 才折减，AirBattle 仍按满额算
+    expect(supplyTier(NODE_TYPE.AirBattle)).toEqual({ label: '满额', fuelPercent: 100, ammoPercent: 100 })
+  })
+
+  it('夜战点半额（10%/10% = 普通 20%/20% 的一半）', () => {
+    expect(supplyTier(NODE_TYPE.NightBattle)).toEqual({
+      label: '夜战·半额',
+      fuelPercent: 50,
+      ammoPercent: 50,
+    })
+  })
+
+  it('空袭点少量（6%/4% ≈ 普通的 30%/20%）', () => {
+    expect(supplyTier(NODE_TYPE.AirRaid)).toEqual({
+      label: '空袭·少量',
+      fuelPercent: 30,
+      ammoPercent: 20,
+    })
+  })
+
+  it('对潜空袭点通常免弹药（8%/0% ≈ 普通的 40%/0%），标注为近似', () => {
+    const tier = supplyTier(NODE_TYPE.SubStrike)
+    expect(tier).toEqual({
+      label: '对潜·通常免弹药',
+      fuelPercent: 40,
+      ammoPercent: 0,
+      approximate: true,
+    })
   })
 })

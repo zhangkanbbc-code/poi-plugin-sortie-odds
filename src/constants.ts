@@ -23,7 +23,7 @@ export const NODE_TYPE = {
   LandBase: -2,
 } as const
 
-export const PLUGIN_UA = 'poi-plugin-sortie-odds/0.8.9'
+export const PLUGIN_UA = 'poi-plugin-sortie-odds/0.9.0'
 
 export const PROPHET_PLUGIN_ID = 'poi-plugin-prophet'
 export const CONFIG_SWITCH_TO_PROPHET = `plugin.${PLUGIN_KEY}.switchToProphet`

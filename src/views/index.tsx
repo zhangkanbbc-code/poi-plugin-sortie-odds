@@ -69,7 +69,9 @@ import {
   rankRoutesByTraffic,
   routeLabel,
   routeNodeSequence,
+  supplyTier,
 } from '../services/route'
+import type { SupplyTier } from '../services/route'
 import { simulatorBridge } from '../services/simulator'
 import { summarizeEngineWarnings } from '../services/warnings'
 import type { DataMeta } from '../services/data-meta'
@@ -575,6 +577,17 @@ const SortieOddsView: React.FC<StateProps> = ({
     () => (mapData ? getBattleEdges(mapData, remainingRoute) : []),
     [mapData, remainingRoute],
   )
+  // 剩余道中按补给消耗档位分组计数——出击/续航前判断要不要带洋上补给
+  const supplyTally = useMemo(() => {
+    const groups = new Map<string, { tier: SupplyTier; count: number }>()
+    for (const edge of battleEdges) {
+      const tier = supplyTier(edge.nodeType)
+      const existing = groups.get(tier.label)
+      if (existing) existing.count += 1
+      else groups.set(tier.label, { tier, count: 1 })
+    }
+    return [...groups.values()].sort((a, b) => b.tier.fuelPercent - a.tier.fuelPercent)
+  }, [battleEdges])
   // 实战中把路线拆成 已走(灰)/当前位置(◆)/剩余 三段展示；
   // 仅当实际路径确为所选路线前缀时可用（末条边不在 KCNav 拓扑时会失配）
   const routeProgress = useMemo(() => {
@@ -916,6 +929,16 @@ const SortieOddsView: React.FC<StateProps> = ({
             {battleEdges.length > 0
               ? `模拟剩余 ${battleEdges.length} 战：${battleEdges.map((edge) => edge.to).join('、')}`
               : '已到目标点'}
+          </span>
+        )}
+        {supplyTally.length > 0 && (
+          <span
+            className="sortie-odds__muted"
+            title="百分比为相对普通战斗（100%）的燃料/弹药消耗，取自模拟器内建常量；对潜档实际免弹药与否仍取决于真实敌方编成"
+          >
+            补给消耗：{supplyTally.map(({ tier, count }) =>
+              `${tier.label}${tier.approximate ? '(视敌情)' : ''}×${count}（油${tier.fuelPercent}%/弹${tier.ammoPercent}%）`,
+            ).join(' · ')}
           </span>
         )}
         <span className="sortie-odds__muted">
@@ -1307,6 +1330,7 @@ const SortieOddsView: React.FC<StateProps> = ({
               <thead>
                 <tr>
                   <th>节点</th>
+                  <th>补给消耗</th>
                   <th>敌编成样本</th>
                   <th>到达率</th>
                   <th>本点大破率</th>
@@ -1317,6 +1341,7 @@ const SortieOddsView: React.FC<StateProps> = ({
               <tbody>
                 {runResult.result.nodes.map((node, index) => {
                   const edge = battleEdges[index]
+                  const tier = edge ? supplyTier(edge.nodeType) : null
                   const nodeReached = total ? node.num / total : Number.NaN
                   const nodeTaiha = node.num ? node.taiha / node.num : Number.NaN
                   const nodeS = node.num ? node.ranks.S / node.num : Number.NaN
@@ -1324,6 +1349,9 @@ const SortieOddsView: React.FC<StateProps> = ({
                   return (
                     <tr key={`${edge?.id ?? index}`}>
                       <td>{edge?.to ?? index + 1} · {edge ? nodeTypeLabel(edge) : ''}</td>
+                      <td>
+                        {tier && `${tier.label}${tier.approximate ? '(视敌情)' : ''} 油${tier.fuelPercent}%/弹${tier.ammoPercent}%`}
+                      </td>
                       <td>{sourceCounts[edge?.id] ?? '—'}</td>
                       <td>{formatPercent(nodeReached)}</td>
                       <td>{formatPercent(nodeTaiha)}</td>
