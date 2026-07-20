@@ -294,7 +294,8 @@ const SortieOddsView: React.FC<StateProps> = ({
   const [gaugeMode, setGaugeMode] = usePersistentState<'auto' | 'all'>('gaugeMode', 'auto')
   const gaugeNum = isEventMap ? (autoEvent?.gaugeNum ?? 0) : 0
   const gaugeBand = isEventMap && gaugeMode === 'auto' ? gaugeBandFor(autoEvent) : null
-  const runGeneration = useRef(0)
+  const runBusyRef = useRef(false)
+  const runPendingRef = useRef<'auto' | 'manual' | null>(null)
   const evidenceGeneration = useRef(0)
   const [gimmicks, setGimmicks] = useState<KcnavGimmicksPayload | null>(null)
   const [gimmickOpen, setGimmickOpen] = usePersistentState('gimmickOpen', false)
@@ -629,7 +630,13 @@ const SortieOddsView: React.FC<StateProps> = ({
     }
     if (waitingForChoice || prophetBattleActive) return
 
-    const generation = ++runGeneration.current
+    // 串行 + 最新优先：模拟在跑时新触发只登记一次待办，跑完立刻用最新状态补跑。
+    // （旧的"作废重来"会让快速推图的玩家永远等不到一次完整结果）
+    if (runBusyRef.current) {
+      runPendingRef.current = trigger
+      return
+    }
+    runBusyRef.current = true
     setRunning(true)
     setProgress(0)
     setError(null)
@@ -639,7 +646,6 @@ const SortieOddsView: React.FC<StateProps> = ({
         battleEdges.map((edge) =>
           loadEnemyComps(mapId, edge.id, { priority, difficulty, gaugeNum, gaugeBand })),
       )
-      if (generation !== runGeneration.current) return
       const failedNodes = enemyResults
         .map((result, index) => result.status === 'rejected' ? battleEdges[index].to : null)
         .filter((node): node is string => node != null)
@@ -672,7 +678,8 @@ const SortieOddsView: React.FC<StateProps> = ({
       const input = buildSimulationInput(
         snapshot,
         battleEdges.map((edge, index) => ({ edge, enemy: enemyPayloads[index] })),
-        samples,
+        // 自动跟随的中途重算降采样提速（±1% 级噪声换 2~3 倍速度）；手动分析用完整采样
+        trigger === 'auto' ? Math.min(samples, 2000) : samples,
         {
           ...(chosenFormation > 0 ? { targetFormation: chosenFormation } : {}),
           nightPolicy,
@@ -693,22 +700,21 @@ const SortieOddsView: React.FC<StateProps> = ({
           ...(debuffDmg !== 1 ? { debuffDmg } : {}),
         },
       )
-      const result = await simulatorBridge.run(input, (value) => {
-        if (generation === runGeneration.current) setProgress(value)
-      })
-      if (generation !== runGeneration.current) return
+      const result = await simulatorBridge.run(input, (value) => setProgress(value))
       setRunResult(result)
       setProgress(1)
     } catch (cause) {
-      if (generation === runGeneration.current) {
-        const message = cause instanceof Error ? cause.message : String(cause)
-        setError(/Unknown ship.*stats required/i.test(message)
-          ? `分析失败：${message} —— 这是活动新敌人，模拟器数据尚未收录；`
-            + '待上游（KC3 kancolle-replay）跟进后更新 vendor 数据即可，通常在活动开放后数日内'
-          : `分析失败：${message}`)
-      }
+      const message = cause instanceof Error ? cause.message : String(cause)
+      setError(/Unknown ship.*stats required/i.test(message)
+        ? `分析失败：${message} —— 这是活动新敌人，模拟器数据尚未收录；`
+          + '待上游（KC3 kancolle-replay）跟进后更新 vendor 数据即可，通常在活动开放后数日内'
+        : `分析失败：${message}`)
     } finally {
-      if (generation === runGeneration.current) setRunning(false)
+      runBusyRef.current = false
+      setRunning(false)
+      const pending = runPendingRef.current
+      runPendingRef.current = null
+      if (pending) void runRef.current(pending)
     }
   }, [
     airbase,
