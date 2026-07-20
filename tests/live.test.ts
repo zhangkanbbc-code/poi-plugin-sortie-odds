@@ -177,6 +177,23 @@ describe('deriveLiveSortie', () => {
     expect(live.actualEdges).toEqual([3, 7, 12])
   })
 
+  it('中途重启的跟随中，"前 N-1 点已结算"下界同样成立', () => {
+    // 结算事件缺漏（own.completedEdgeCount 偏小）时不能把已打完的节点算回剩余
+    const own = {
+      ...initialState,
+      active: true,
+      mapId: '62-3',
+      actualEdges: [3, 7, 12, 15, 30],
+      completedEdgeCount: 1,
+    }
+    const live = deriveLiveSortie(own, {
+      sortieMapId: 0,
+      sortieStatus: [false, false, false, false],
+      spotHistory: [],
+    })
+    expect(live.completedEdgeCount).toBe(4)
+  })
+
   it('中途重启的跟随中，战斗中状态仍从核心 battle 派生', () => {
     const own = { ...initialState, active: true, mapId: '62-3', actualEdges: [3] }
     const cleared = {

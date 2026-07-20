@@ -34,12 +34,18 @@ export const restoreLiveState = (
   if (!saved?.active) return defaultState
   const startedAt = Number(saved.startedAt ?? 0)
   if (!(startedAt > 0) || now - startedAt > RESTORE_MAX_AGE_MS) return defaultState
+  const actualEdges = Array.isArray(saved.actualEdges)
+    ? saved.actualEdges.filter((edge) => Number.isFinite(edge) && edge > 0)
+    : []
   return {
     ...defaultState,
     ...saved,
-    actualEdges: Array.isArray(saved.actualEdges)
-      ? saved.actualEdges.filter((edge) => Number.isFinite(edge) && edge > 0)
-      : [],
+    actualEdges,
+    // "能走到第 N 点说明前 N-1 点已结算"下界在恢复时也要成立
+    completedEdgeCount: Math.max(
+      Number(saved.completedEdgeCount ?? 0) || 0,
+      Math.max(0, actualEdges.length - 1),
+    ),
     // 战斗中状态不恢复——重启后由核心 state.battle 实时派生
     battleOngoing: false,
   }

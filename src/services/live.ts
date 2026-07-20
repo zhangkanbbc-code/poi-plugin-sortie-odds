@@ -100,11 +100,18 @@ export const deriveLiveSortie = (
   if (!inSortie) {
     if (!base.active) return base
     // 自有记账仍在出击中：核心清零视为"重启后续走"，保持跟随；
-    // 战斗中状态仍从核心 battle 派生（它在重启后照常工作）
+    // 战斗中状态仍从核心 battle 派生（它在重启后照常工作）。
+    // "能走到第 N 点说明前 N-1 点已结算"的下界在此分支同样必须成立，
+    // 否则结算事件缺漏时会把已打完的节点重新算进剩余模拟
     const ongoing = battle?._status !== undefined
       ? battle._status?.battle != null
       : base.battleOngoing
-    return ongoing === base.battleOngoing ? base : { ...base, battleOngoing: ongoing }
+    const completed = Math.max(
+      base.completedEdgeCount,
+      Math.max(0, base.actualEdges.length - 1),
+    )
+    if (ongoing === base.battleOngoing && completed === base.completedEdgeCount) return base
+    return { ...base, battleOngoing: ongoing, completedEdgeCount: completed }
   }
   const actualEdges = (sortie?.spotHistory ?? [])
     .slice(1)

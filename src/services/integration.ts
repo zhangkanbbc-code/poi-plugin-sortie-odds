@@ -111,7 +111,12 @@ export const completedEdgeCountFromLogs = (
   settlement: AkashicSettlement | null,
   notBefore = 0,
 ): number => {
-  let completed = Math.min(ownCompletedCount, actualEdges.length)
+  // 上钳：结算数不可能超过已走边数；下界：能走到第 N 点说明前 N-1 点已结算。
+  // 下界在视图边界再兜一次底，任何来源的结算缺漏都不会把已打完的节点算回剩余模拟
+  let completed = Math.max(
+    Math.min(ownCompletedCount, actualEdges.length),
+    actualEdges.length - 1,
+  )
   if (!settlement || settlement.mapId !== mapId || settlement.timestamp < notBefore) return completed
   const edgeMap = getEdgeMap(map)
   for (let index = actualEdges.length - 1; index >= 0; index -= 1) {

@@ -85,6 +85,11 @@ describe('restoreLiveState（poi 重启后恢复出击记账）', () => {
     expect(restored.battleOngoing).toBe(false)
   })
 
+  it('恢复时结算数补齐"前 N-1 点已结算"下界', () => {
+    const restored = restoreLiveState({ ...saved, completedEdgeCount: 0 }, now)
+    expect(restored.completedEdgeCount).toBe(2)
+  })
+
   it('超过 12 小时的存档不恢复（出击不可能跨半天）', () => {
     const stale = { ...saved, startedAt: now - 13 * 3600 * 1000 }
     expect(restoreLiveState(stale, now).active).toBe(false)

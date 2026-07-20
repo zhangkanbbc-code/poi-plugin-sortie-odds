@@ -84,5 +84,8 @@ describe('plugin integrations', () => {
       node: 'B',
       rank: 'S',
     }, 1000)).toBe(1)
+    // 结算记账全丢时也有"前 N-1 点已结算"下界（视图边界兜底）
+    expect(completedEdgeCountFromLogs(map, [1, 2], '1-1', 0, null, 0)).toBe(1)
+    expect(completedEdgeCountFromLogs(map, [], '1-1', 0, null, 0)).toBe(0)
   })
 })
