@@ -85,8 +85,10 @@ export const parseSortieMapId = (raw: unknown): string | null => {
   return `${text.slice(0, -1)}-${text.slice(-1)}`
 }
 
-// 海域、实际路线与战斗中状态以 poi 核心状态为准（不受插件加载时序影响，
-// 中途重载也不丢）；结算记账字段（lastRank/settlementAt/startedAt）仍来自自有 reducer
+// 海域、实际路线与战斗中状态以 poi 核心状态为准（不受插件加载时序影响）；
+// 结算记账字段（lastRank/settlementAt/startedAt）仍来自自有 reducer。
+// 例外：poi 中途重启（api_start2）会把核心 sortie 清零而游戏继续本次出击，
+// 此时自有持久化记账（含完整已走前缀）才是权威，真正回港由 api_port/port 重置自有状态
 export const deriveLiveSortie = (
   own: LiveSortieState | undefined,
   sortie: PoiSortieSlice | undefined,
@@ -96,7 +98,13 @@ export const deriveLiveSortie = (
   const mapId = parseSortieMapId(sortie?.sortieMapId)
   const inSortie = mapId != null && (sortie?.sortieStatus ?? []).some(Boolean)
   if (!inSortie) {
-    return base.active ? { ...base, active: false } : base
+    if (!base.active) return base
+    // 自有记账仍在出击中：核心清零视为"重启后续走"，保持跟随；
+    // 战斗中状态仍从核心 battle 派生（它在重启后照常工作）
+    const ongoing = battle?._status !== undefined
+      ? battle._status?.battle != null
+      : base.battleOngoing
+    return ongoing === base.battleOngoing ? base : { ...base, battleOngoing: ongoing }
   }
   const actualEdges = (sortie?.spotHistory ?? [])
     .slice(1)

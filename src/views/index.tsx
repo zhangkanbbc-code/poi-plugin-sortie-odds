@@ -1267,13 +1267,16 @@ const SortieOddsView: React.FC<StateProps> = ({
             <div className="sortie-odds__muted" style={{ margin: '0 0 10px' }}>
               本次结果：{new Date(runBasis.at).toLocaleTimeString()} 模拟
               {runBasis.nodes ? ` ${runBasis.nodes}` : ''} · {runBasis.samples} 抽
+              · {runBasis.edges ? '实战跟随' : '计划模式（从起点模拟）'}
               {running && ' ｜ 正在按最新位置重算…'}
             </div>
           )}
 
           {isEventMap && autoEvent && total > 0
             && (runResult.result.totalTransport ?? 0) > 0
-            && (autoEvent.gaugeType === 3 || (capabilities?.transportS ?? 0) >= 20)
+            // 明确是战力条（gaugeType=2）时不显示运输结算；类型未知时按容量回退显示
+            && (autoEvent.gaugeType === 3
+              || (autoEvent.gaugeType !== 2 && (capabilities?.transportS ?? 0) >= 20))
             && (() => {
             const avgTp = (runResult.result.totalTransport ?? 0) / total
             const tpS = capabilities?.transportS ?? 0

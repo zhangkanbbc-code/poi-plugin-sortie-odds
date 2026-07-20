@@ -158,9 +158,38 @@ describe('deriveLiveSortie', () => {
     expect(live.active).toBe(false)
   })
 
-  it('核心显示未出击时强制 active=false，即使自有状态说在出击', () => {
-    const own = { ...initialState, active: true, mapId: '1-5', actualEdges: [3] }
+  it('poi 中途重启（核心 sortie 被清零）时以自有持久化记账为准，保持跟随', () => {
+    // api_start2 清空核心 sortie 但游戏可续走本次出击（poi 核心源码注释明示此场景）
+    const own = {
+      ...initialState,
+      active: true,
+      mapId: '62-3',
+      actualEdges: [3, 7, 12],
+      completedEdgeCount: 2,
+    }
     const live = deriveLiveSortie(own, {
+      sortieMapId: 0,
+      sortieStatus: [false, false, false, false],
+      spotHistory: [],
+    })
+    expect(live.active).toBe(true)
+    expect(live.mapId).toBe('62-3')
+    expect(live.actualEdges).toEqual([3, 7, 12])
+  })
+
+  it('中途重启的跟随中，战斗中状态仍从核心 battle 派生', () => {
+    const own = { ...initialState, active: true, mapId: '62-3', actualEdges: [3] }
+    const cleared = {
+      sortieMapId: 0,
+      sortieStatus: [false, false, false, false],
+      spotHistory: [],
+    }
+    expect(deriveLiveSortie(own, cleared, { _status: { battle: {} } }).battleOngoing).toBe(true)
+    expect(deriveLiveSortie(own, cleared, { _status: { battle: null } }).battleOngoing).toBe(false)
+  })
+
+  it('自有状态也未出击时保持 inactive（真正在母港）', () => {
+    const live = deriveLiveSortie(initialState, {
       sortieMapId: 0,
       sortieStatus: [false, false, false, false],
       spotHistory: [],

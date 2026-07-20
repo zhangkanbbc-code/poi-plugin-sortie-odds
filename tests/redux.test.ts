@@ -2,8 +2,10 @@ import { describe, expect, it } from 'vitest'
 
 import {
   appendEdge,
+  initialState,
   markBattleStart,
   reducer,
+  restoreLiveState,
   setLbasStrikes,
   settleBattle,
   startSortie,
@@ -48,5 +50,54 @@ describe('sortie settlement state', () => {
     const moved = reducer(fighting, appendEdge(5))
     expect(moved.battleOngoing).toBe(false)
     expect(moved.actualEdges).toEqual([1, 5])
+  })
+
+  it('结算不回退已完成边数（poi 中途重启后核心 spotHistory 被截断的场合）', () => {
+    const state = {
+      ...initialState,
+      active: true,
+      actualEdges: [1, 2, 3, 4, 5],
+      completedEdgeCount: 4,
+    }
+    // 核心截断后 handler 只能算出 1，取 max 保住已知进度
+    expect(reducer(state, settleBattle('A', 1)).completedEdgeCount).toBe(4)
+    expect(reducer(state, settleBattle('S', 5)).completedEdgeCount).toBe(5)
+  })
+})
+
+describe('restoreLiveState（poi 重启后恢复出击记账）', () => {
+  const now = 1_700_000_000_000
+  const saved = {
+    active: true,
+    mapId: '62-3',
+    actualEdges: [3, 7, 12],
+    startedAt: now - 30 * 60 * 1000,
+    completedEdgeCount: 2,
+    battleOngoing: true,
+  }
+
+  it('未过期的出击恢复完整路径，battleOngoing 不恢复', () => {
+    const restored = restoreLiveState(saved, now)
+    expect(restored.active).toBe(true)
+    expect(restored.mapId).toBe('62-3')
+    expect(restored.actualEdges).toEqual([3, 7, 12])
+    expect(restored.completedEdgeCount).toBe(2)
+    expect(restored.battleOngoing).toBe(false)
+  })
+
+  it('超过 12 小时的存档不恢复（出击不可能跨半天）', () => {
+    const stale = { ...saved, startedAt: now - 13 * 3600 * 1000 }
+    expect(restoreLiveState(stale, now).active).toBe(false)
+  })
+
+  it('未出击/缺失/损坏的存档回落默认态', () => {
+    expect(restoreLiveState(undefined, now).active).toBe(false)
+    expect(restoreLiveState({ active: false }, now).active).toBe(false)
+    expect(restoreLiveState({ active: true, startedAt: 0 }, now).active).toBe(false)
+    const badEdges = restoreLiveState(
+      { ...saved, actualEdges: 'garbage' as unknown as number[] },
+      now,
+    )
+    expect(badEdges.actualEdges).toEqual([])
   })
 })

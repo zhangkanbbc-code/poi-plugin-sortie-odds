@@ -1,7 +1,8 @@
 import { store } from 'views/create-store'
 
-import { CONFIG_SWITCH_TO_PROPHET, PROPHET_PLUGIN_ID } from './constants'
+import { CONFIG_SWITCH_TO_PROPHET, PLUGIN_KEY, PROPHET_PLUGIN_ID } from './constants'
 import {
+  LIVE_CONFIG_PATH,
   appendEdge,
   markBattleStart,
   resetSortie,
@@ -49,6 +50,20 @@ const toEdge = (value: unknown): number | null => {
   return Number.isFinite(edge) && edge > 0 ? edge : null
 }
 
+type ExtState = { ext?: Record<string, { actualEdges?: number[] } | undefined> }
+
+// 记账动作后立刻持久化：poi 重启（api_start2）会清空核心 sortie 状态，
+// 但游戏能中途续走——恢复靠这份存档（见 redux.restoreLiveState）
+const sync = (action: Parameters<typeof store.dispatch>[0]): void => {
+  store.dispatch(action)
+  try {
+    const live = (store.getState() as ExtState).ext?.[PLUGIN_KEY]
+    if (live) window.config?.set(LIVE_CONFIG_PATH, live)
+  } catch {
+    // 配置写失败不阻断游戏事件处理
+  }
+}
+
 // 战斗系响应（不含结算/回港）：昼战/夜战/空袭战/联合舰队各形态的首个战斗包
 const BATTLE_PATH = /^\/kcsapi\/api_req_(sortie|battle_midnight|combined_battle)\//
 const NON_BATTLE_SUFFIX = /(battleresult|goback_port)$/
@@ -85,7 +100,7 @@ const handleGameResponse = (event: Event): void => {
   }
 
   if (path === '/kcsapi/api_port/port') {
-    store.dispatch(resetSortie())
+    sync(resetSortie())
     return
   }
 
@@ -93,7 +108,7 @@ const handleGameResponse = (event: Event): void => {
     const area = Number(postBody?.api_maparea_id ?? body.api_maparea_id)
     const map = Number(postBody?.api_mapinfo_no ?? body.api_mapinfo_no)
     if (!Number.isFinite(area) || !Number.isFinite(map)) return
-    store.dispatch(startSortie(`${area}-${map}`, toEdge(body.api_no)))
+    sync(startSortie(`${area}-${map}`, toEdge(body.api_no)))
     return
   }
 
@@ -103,23 +118,26 @@ const handleGameResponse = (event: Event): void => {
       parseStrikePoints(postBody?.api_strike_point_2),
       parseStrikePoints(postBody?.api_strike_point_3),
     ].filter((cells): cells is number[] => cells != null)
-    if (strikes.length > 0) store.dispatch(setLbasStrikes(strikes))
+    if (strikes.length > 0) sync(setLbasStrikes(strikes))
     return
   }
 
   if (path === '/kcsapi/api_req_map/next') {
     const edge = toEdge(body.api_no)
-    if (edge != null) store.dispatch(appendEdge(edge))
+    if (edge != null) sync(appendEdge(edge))
     return
   }
 
   if (path.endsWith('/battleresult')) {
     const rank = typeof body.api_win_rank === 'string' ? body.api_win_rank : ''
     if (!rank) return
-    // 完成边数以 poi 核心 spotHistory 为准，避免 start 事件缺失时记账为 0
-    const sortie = (store.getState() as { sortie?: PoiSortieSlice }).sortie
-    const traversed = Math.max(0, (sortie?.spotHistory?.length ?? 0) - 1)
-    store.dispatch(settleBattle(rank, traversed > 0 ? traversed : undefined))
+    // 完成边数取核心 spotHistory 与自有记账的较大值：
+    // poi 中途重启后核心被截断，自有恢复的路径才是全量
+    const state = store.getState() as { sortie?: PoiSortieSlice } & ExtState
+    const coreTraversed = Math.max(0, (state.sortie?.spotHistory?.length ?? 0) - 1)
+    const ownTraversed = state.ext?.[PLUGIN_KEY]?.actualEdges?.length ?? 0
+    const traversed = Math.max(coreTraversed, ownTraversed)
+    sync(settleBattle(rank, traversed > 0 ? traversed : undefined))
   }
 }
 
