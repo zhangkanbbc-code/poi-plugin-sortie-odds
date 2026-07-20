@@ -3,6 +3,7 @@ import { store } from 'views/create-store'
 import { CONFIG_SWITCH_TO_PROPHET, PROPHET_PLUGIN_ID } from './constants'
 import {
   appendEdge,
+  markBattleStart,
   resetSortie,
   setLbasStrikes,
   settleBattle,
@@ -76,6 +77,12 @@ const handleGameResponse = (event: Event): void => {
   if (!body) return
 
   switchToProphetOnBattle(path)
+
+  // 战斗中标记：首个战斗包置位，battleresult/进点/回港清除（见 redux 各 case）。
+  // 重算门控靠它精确暂停在"开打→结算"区间，而不是整个"到点→结算"
+  if (BATTLE_PATH.test(path) && !NON_BATTLE_SUFFIX.test(path)) {
+    store.dispatch(markBattleStart())
+  }
 
   if (path === '/kcsapi/api_port/port') {
     store.dispatch(resetSortie())

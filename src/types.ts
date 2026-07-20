@@ -271,6 +271,10 @@ export interface LiveSortieState {
   updatedAt: number
   // 本次出击基航实际派遣：每基地两波的目标格子号（api_strike_point_N）
   lbasStrikes: number[][] | null
+  // 当前节点战斗进行中（战斗包已到、battleresult 未到）。
+  // 不能用 prophet 的 sortieState 判断——它整个出击期间常驻 2，
+  // 会把"刚到新节点未开战"误判为战斗中，堵死到点重算的窗口
+  battleOngoing: boolean
 }
 
 export interface ProphetShipSnapshot {

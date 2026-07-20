@@ -6,6 +6,7 @@ const EDGE = `@@${PLUGIN_KEY}/edge`
 const RESET = `@@${PLUGIN_KEY}/reset`
 const SETTLEMENT = `@@${PLUGIN_KEY}/settlement`
 const LBAS_STRIKES = `@@${PLUGIN_KEY}/lbas-strikes`
+const BATTLE_START = `@@${PLUGIN_KEY}/battle-start`
 
 export const initialState: LiveSortieState = {
   active: false,
@@ -17,6 +18,7 @@ export const initialState: LiveSortieState = {
   settlementAt: 0,
   updatedAt: 0,
   lbasStrikes: null,
+  battleOngoing: false,
 }
 
 export const startSortie = (mapId: string, edge: number | null) => ({
@@ -36,6 +38,7 @@ export const settleBattle = (rank: string, completedEdges?: number) => ({
   rank,
   completedEdges,
 })
+export const markBattleStart = () => ({ type: BATTLE_START })
 
 type SortieAction =
   | ReturnType<typeof startSortie>
@@ -43,6 +46,7 @@ type SortieAction =
   | ReturnType<typeof resetSortie>
   | ReturnType<typeof settleBattle>
   | ReturnType<typeof setLbasStrikes>
+  | ReturnType<typeof markBattleStart>
   | { type: string }
 
 export const reducer = (
@@ -63,12 +67,15 @@ export const reducer = (
         settlementAt: 0,
         updatedAt: now,
         lbasStrikes: null,
+        battleOngoing: false,
       }
     }
     case LBAS_STRIKES: {
       const strikes = action as ReturnType<typeof setLbasStrikes>
       return { ...state, lbasStrikes: strikes.strikes, updatedAt: Date.now() }
     }
+    case BATTLE_START:
+      return state.battleOngoing ? state : { ...state, battleOngoing: true, updatedAt: Date.now() }
     case SETTLEMENT: {
       const settlement = action as ReturnType<typeof settleBattle>
       return {
@@ -77,6 +84,7 @@ export const reducer = (
         lastRank: settlement.rank,
         settlementAt: Date.now(),
         updatedAt: Date.now(),
+        battleOngoing: false,
       }
     }
     case EDGE: {
@@ -87,6 +95,7 @@ export const reducer = (
         active: true,
         actualEdges: [...state.actualEdges, next.edge],
         updatedAt: Date.now(),
+        battleOngoing: false,
       }
     }
     case RESET:

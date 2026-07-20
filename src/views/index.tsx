@@ -603,8 +603,11 @@ const SortieOddsView: React.FC<StateProps> = ({
     () => prophetBattleFingerprint(integration.prophetBattle),
     [integration.prophetBattle],
   )
-  const prophetBattleActive = integration.prophetBattle?.sortieState === 2
-    && completedEdgeCount < actualEdges.length
+  // 战斗中暂停重算：用自有记账（战斗包→结算的精确区间）。
+  // 曾用 prophet 的 sortieState===2 判断，但它整个出击期间常驻 2，
+  // 叠加 completedEdgeCount<actualEdges.length 会把"刚到新节点未开战"
+  // 也判成战斗中，堵死到点重算的窗口（0.8.3 实测：到 T 点仍显示 S 起点的旧结果）
+  const battleOngoing = live.active && live.mapId === mapId && live.battleOngoing
 
   useEffect(() => {
     setRunResult(null)
@@ -650,7 +653,7 @@ const SortieOddsView: React.FC<StateProps> = ({
       setError('当前没有可读取的出击舰队。')
       return
     }
-    if (waitingForChoice || prophetBattleActive) return
+    if (waitingForChoice || battleOngoing) return
 
     // 串行 + 最新优先：模拟在跑时新触发只登记一次待办，跑完立刻用最新状态补跑。
     // （旧的"作废重来"会让快速推图的玩家永远等不到一次完整结果）
@@ -757,7 +760,7 @@ const SortieOddsView: React.FC<StateProps> = ({
     mapId,
     midFormation,
     nightPolicy,
-    prophetBattleActive,
+    battleOngoing,
     bonusDmgAll,
     bonusPerShip,
     debuffDmg,
@@ -806,7 +809,7 @@ const SortieOddsView: React.FC<StateProps> = ({
       !autoAnalyze
       || !live.active
       || waitingForChoice
-      || prophetBattleActive
+      || battleOngoing
       || !effectiveRoute.length
     ) {
       return undefined
@@ -820,7 +823,7 @@ const SortieOddsView: React.FC<StateProps> = ({
     integration.latestAkashic?.timestamp,
     live.active,
     live.updatedAt,
-    prophetBattleActive,
+    battleOngoing,
     prophetUpdateKey,
     target,
     waitingForChoice,
@@ -885,7 +888,7 @@ const SortieOddsView: React.FC<StateProps> = ({
 
       <div className="sortie-odds__route">
         <Tag intent={live.active && live.mapId === mapId ? 'success' : 'none'}>
-          {prophetBattleActive
+          {battleOngoing
             ? '战斗中 · 结算后自动重算'
             : live.active && live.mapId === mapId
               ? '实战状态自动跟随中'
@@ -1109,7 +1112,7 @@ const SortieOddsView: React.FC<StateProps> = ({
             !mapData
             || !battleEdges.length
             || waitingForChoice
-            || prophetBattleActive
+            || battleOngoing
             || targetAlreadySettled
           }
           onClick={() => void runAnalysis('manual')}
