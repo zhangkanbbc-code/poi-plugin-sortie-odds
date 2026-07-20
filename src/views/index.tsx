@@ -149,6 +149,7 @@ const FORMATION_NAMES = new Map<number, string>([
   [3, '轮形'],
   [4, '梯形'],
   [5, '单横'],
+  [6, '警戒'],
   [11, '第一警戒'],
   [12, '第二警戒'],
   [13, '第三警戒'],
@@ -241,6 +242,7 @@ const SortieOddsView: React.FC<StateProps> = ({
   const [bonusDmgAll, setBonusDmgAll] = usePersistentState('bonusDmgAll', 1)
   const [debuffDmg, setDebuffDmg] = usePersistentState('debuffDmg', 1)
   const [switchToProphet, setSwitchToProphet] = usePersistentState('switchToProphet', true)
+  const [midFormation, setMidFormation] = usePersistentState('midFormation', 0)
 
   const lbasBaseCount = useMemo(() => {
     const world = Number(mapId.split('-')[0]) || 0
@@ -656,6 +658,7 @@ const SortieOddsView: React.FC<StateProps> = ({
             }
             : {}),
           ...(smokeEdge > 0 ? { smokeEdgeId: smokeEdge } : {}),
+          ...(midFormation > 0 ? { midFormation } : {}),
           ...(bonusDmgAll !== 1 ? { bonusDmgAll } : {}),
           ...(debuffDmg !== 1 ? { debuffDmg } : {}),
         },
@@ -688,6 +691,7 @@ const SortieOddsView: React.FC<StateProps> = ({
     equipsById,
     mapData,
     mapId,
+    midFormation,
     nightPolicy,
     prophetBattleActive,
     bonusDmgAll,
@@ -1023,9 +1027,20 @@ const SortieOddsView: React.FC<StateProps> = ({
                 ? `目标点阵形：自动（特攻→${formationName(capabilities.specialFormations[0])}）`
                 : '目标点阵形：自动',
             },
-            ...(snapshot.combinedFlag ? [11, 12, 13, 14] : [1, 2, 3, 4, 5]).map((id) => ({
+            ...(snapshot.combinedFlag ? [11, 12, 13, 14] : [1, 2, 3, 4, 5, 6]).map((id) => ({
               value: id,
               label: `目标点阵形：${formationName(id)}`,
+            })),
+          ]}
+        />
+        <HTMLSelect
+          value={midFormation}
+          onChange={(event) => setMidFormation(Number(event.currentTarget.value))}
+          options={[
+            { value: 0, label: '道中阵形：自动' },
+            ...(snapshot.combinedFlag ? [11, 12, 13, 14] : [1, 2, 3, 4, 5, 6]).map((id) => ({
+              value: id,
+              label: `道中阵形：${formationName(id)}`,
             })),
           ]}
         />

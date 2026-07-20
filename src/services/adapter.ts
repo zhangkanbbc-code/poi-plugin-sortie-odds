@@ -156,6 +156,9 @@ export type NightPolicy = 'always' | 'ifBelowA' | 'never'
 export interface SimulationBuildOptions {
   // 覆盖目标点（最后一个节点）的我方阵形；特攻编成需要特定阵形才能触发
   targetFormation?: number
+  // 覆盖道中（非目标）战斗节点的我方阵形（输送队道中警戒阵等打法）；
+  // 空袭点保持启发式（轮形/第三警戒）
+  midFormation?: number
   // 目标点夜战策略：默认总是进夜战（求 S 的真实打法）；
   // ifBelowA=昼战未达 A 才进（刷图省资源）；never=不进
   nightPolicy?: NightPolicy
@@ -240,7 +243,9 @@ export const buildSimulationInput = (
       fleetEComps: toEnemyComps(enemy),
       formationOverride: isTarget && options.targetFormation
         ? options.targetFormation
-        : playerFormation(edge, enemy, combined),
+        : (!isTarget && options.midFormation && edge.nodeType !== NODE_TYPE.AirRaid
+          ? options.midFormation
+          : playerFormation(edge, enemy, combined)),
       doNB: nightCapable && nightPolicy !== 'never',
       ...(nightCapable && nightPolicy === 'ifBelowA'
         ? { doNBCond: 'A' as const }

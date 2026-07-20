@@ -132,6 +132,20 @@ describe('simulator adapter', () => {
     expect(input.nodes[1].lbas).toEqual([1, 1])
   })
 
+  it('midFormation 覆盖道中节点阵形，空袭点与目标点不受影响', () => {
+    const midEdge: RouteEdge = { id: 1, from: '1', to: 'A', nodeType: 4, eventKind: 4 }
+    const airEdge: RouteEdge = { id: 2, from: 'A', to: 'B', nodeType: 10, eventKind: 6 }
+    const input = buildSimulationInput(
+      snapshot,
+      [{ edge: midEdge, enemy }, { edge: airEdge, enemy }, { edge, enemy }],
+      1000,
+      { midFormation: 6 },
+    )
+    expect(input.nodes[0].formationOverride).toBe(6)
+    expect(input.nodes[1].formationOverride).toBe(3)
+    expect(input.nodes[2].formationOverride).toBe(1)
+  })
+
   it('特效倍率与破甲倍率逐舰注入', () => {
     const input = buildSimulationInput(snapshot, [{ edge, enemy }], 1000, {
       bonusDmgAll: 1.2,
