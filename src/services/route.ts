@@ -169,28 +169,15 @@ export const pickAutoTarget = (
   // 否则全体人流都会路过的道中点必然得分最高
   const bosses = reachable.filter((option) => option.nodeType === NODE_TYPE.Boss)
   const pool = bosses.length > 0 ? bosses : reachable
-  // 有统计样本时选"当前期数人流最大"的目标：多 boss 图（战力/运输分属不同血条）
-  // 由带期数过滤的通过量决定该打哪个点
+  // 有统计样本时选"同编成通过量最大"的目标：多 boss 图（战力/运输分属不同血条）
+  // 按各目标入口边的样本求和评分——部分数据（只查了入口边）也能工作
   if (samples && pool.length > 1) {
-    const ignore = new Set(actualEdges)
+    const entryEdges = getEdges(map)
     let best: { to: string; score: number } | null = null
     for (const option of pool) {
-      const routes = rankRoutesByTraffic(
-        map,
-        buildRouteChoices(map, actualEdges, option.to, 8),
-        samples,
-        ignore,
-      )
-      const edgeMap = getEdgeMap(map)
-      const top = routes[0] ?? []
-      const battle = top.filter((edgeId) => {
-        if (ignore.has(edgeId)) return false
-        const edge = edgeMap.get(edgeId)
-        return edge != null && ENEMY_NODE_TYPES.has(edge.nodeType)
-      })
-      const score = battle.length
-        ? Math.min(...battle.map((edgeId) => samples[edgeId] ?? 0))
-        : 0
+      const score = entryEdges
+        .filter((edge) => edge.to === option.to)
+        .reduce((sum, edge) => sum + (samples[edge.id] ?? 0), 0)
       if (score > 0 && (best == null || score > best.score)) {
         best = { to: option.to, score }
       }

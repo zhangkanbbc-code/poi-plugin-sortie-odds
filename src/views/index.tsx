@@ -402,57 +402,64 @@ const SortieOddsView: React.FC<StateProps> = ({
     setCompRelaxed(false)
     if (!mapData || !routingFeatures.mainComp) return undefined
     const traversed = new Set(actualEdges)
-    const union = new Set<number>()
-    // 并集覆盖所有可达目标的候选路线：统计既用于路线排序，也用于多 boss 图的目标选取
+    // 目标入口边优先（几条就能定该打哪个 boss），其余候选路线边随后补全；
+    // 结果逐边渐进落地，单边失败跳过不作废
+    const targetEntryEdges = new Set<number>()
+    for (const option of getTargetOptions(mapData)) {
+      for (const edge of getEdges(mapData)) {
+        if (edge.to === option.to && !traversed.has(edge.id)) targetEntryEdges.add(edge.id)
+      }
+    }
+    const restEdges = new Set<number>()
     for (const option of getTargetOptions(mapData)) {
       for (const route of buildRouteChoices(mapData, actualEdges, option.to, 8)) {
         for (const edge of getBattleEdges(mapData, route)) {
-          if (!traversed.has(edge.id)) union.add(edge.id)
+          if (!traversed.has(edge.id) && !targetEntryEdges.has(edge.id)) restEdges.add(edge.id)
         }
       }
     }
-    if (union.size === 0) return undefined
+    const ordered = [...targetEntryEdges, ...restEdges]
+    if (ordered.length === 0) return undefined
     const timer = setTimeout(() => {
       void (async () => {
-        try {
-          const query = async (
-            features: typeof routingFeatures,
-          ): Promise<Record<number, number> | null> => {
-            const counts: Record<number, number> = {}
-            for (const edgeId of union) {
+        const query = async (
+          features: typeof routingFeatures,
+          markRelaxed: boolean,
+        ): Promise<boolean> => {
+          const counts: Record<number, number> = {}
+          let anyHit = false
+          for (const edgeId of ordered) {
+            try {
               const loaded = await loadRouteEvidence(mapId, [edgeId], features, {
                 difficulty,
                 gaugeNum,
               })
-              if (generation !== compGeneration.current) return null
+              if (generation !== compGeneration.current) return anyHit
               counts[edgeId] = evidencePayloadCount(loaded.value)
+              if (counts[edgeId] > 0) anyHit = true
+            } catch {
+              if (generation !== compGeneration.current) return anyHit
+              // 单边失败：跳过，不计入（≠0 样本），整体继续
             }
-            return counts
+            if (anyHit) {
+              setCompCounts({ ...counts })
+              setCompRelaxed(markRelaxed)
+            }
           }
-          const strict = await query(routingFeatures)
-          if (strict == null) return
-          if (Object.values(strict).some((count) => count > 0)) {
-            setCompCounts(strict)
-            return
-          }
-          // 严格条件下一条同编成记录都没有：放宽速力/电探/桶/司令部再查
-          const relaxed = await query({
-            ...routingFeatures,
-            radars: -1,
-            drums: -1,
-            radarShips: -1,
-            speed: 0,
-            hqMin: 0,
-            hqMax: 0,
-          })
-          if (relaxed == null) return
-          if (Object.values(relaxed).some((count) => count > 0)) {
-            setCompCounts(relaxed)
-            setCompRelaxed(true)
-          }
-        } catch {
-          if (generation === compGeneration.current) setCompCounts(null)
+          return anyHit
         }
+        const strictHit = await query(routingFeatures, false)
+        if (generation !== compGeneration.current || strictHit) return
+        // 严格条件下一条同编成记录都没有：放宽速力/电探/桶/司令部再查
+        await query({
+          ...routingFeatures,
+          radars: -1,
+          drums: -1,
+          radarShips: -1,
+          speed: 0,
+          hqMin: 0,
+          hqMax: 0,
+        }, true)
       })()
     }, 3000)
     return () => clearTimeout(timer)
