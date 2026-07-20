@@ -10,6 +10,7 @@ import {
   Button,
   Callout,
   Card,
+  Collapse,
   FormGroup,
   HTMLSelect,
   InputGroup,
@@ -265,6 +266,7 @@ const SortieOddsView: React.FC<StateProps> = ({
   const runGeneration = useRef(0)
   const evidenceGeneration = useRef(0)
   const [gimmicks, setGimmicks] = useState<KcnavGimmicksPayload | null>(null)
+  const [gimmickOpen, setGimmickOpen] = usePersistentState('gimmickOpen', false)
 
   // 活动图解密条件（KCNav 众包数据，按难度分期），走队列+磁盘缓存
   useEffect(() => {
@@ -909,13 +911,22 @@ const SortieOddsView: React.FC<StateProps> = ({
       )}
 
       {isEventMap && gimmickPhases.length > 0 && (
-        <Callout intent="primary" title="本图解密条件（KCNav 众包，按当前难度）" style={{ marginBottom: 10 }}>
-          {gimmickPhases.map((entry) => (
-            <div key={entry.phase}>第{entry.phase}期：{entry.nodes}</div>
-          ))}
-          <div className="sortie-odds__muted">
-            游戏 API 不暴露解密完成进度（只有当前第几条血条可读）——若开路未完成，实际带路会与预测不符，请以游戏内为准。
+        <Callout intent="primary" style={{ marginBottom: 10 }}>
+          <div
+            style={{ cursor: 'pointer', fontWeight: 600 }}
+            onClick={() => setGimmickOpen(!gimmickOpen)}
+          >
+            {gimmickOpen ? '▾' : '▸'} 本图解密条件（KCNav 众包，按当前难度
+            {gimmickOpen ? '' : ` · ${gimmickPhases.length} 期，点击展开`}）
           </div>
+          <Collapse isOpen={gimmickOpen}>
+            {gimmickPhases.map((entry) => (
+              <div key={entry.phase}>第{entry.phase}期：{entry.nodes}</div>
+            ))}
+            <div className="sortie-odds__muted">
+              游戏 API 不暴露解密完成进度（只有当前第几条血条可读）——若开路未完成，实际带路会与预测不符，请以游戏内为准。
+            </div>
+          </Collapse>
         </Callout>
       )}
 
