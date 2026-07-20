@@ -311,6 +311,7 @@ const SortieOddsView: React.FC<StateProps> = ({
   const evidenceGeneration = useRef(0)
   const [gimmicks, setGimmicks] = useState<KcnavGimmicksPayload | null>(null)
   const [gimmickOpen, setGimmickOpen] = usePersistentState('gimmickOpen', false)
+  const [advancedOpen, setAdvancedOpen] = usePersistentState('advancedOpen', false)
 
   // 活动图解密条件（KCNav 众包数据，按难度分期），走队列+磁盘缓存
   useEffect(() => {
@@ -843,6 +844,17 @@ const SortieOddsView: React.FC<StateProps> = ({
     waitingForChoice,
   ])
 
+  // 折叠时也要能看出里面是不是改过默认值——收起不等于状态被藏起来
+  const advancedSummary = [
+    targetFormation !== 0 && `目标点阵形:${formationName(targetFormation)}`,
+    midFormation !== 0 && `道中阵形:${formationName(midFormation)}`,
+    nightPolicy !== 'always' && `夜战:${nightPolicy === 'never' ? '不进' : '未达A才进'}`,
+    bonusDmgAll !== 1 && `特效×${bonusDmgAll}`,
+    debuffDmg !== 1 && `破甲×${debuffDmg}`,
+    smokeEdge !== 0 && '烟幕已选',
+    !switchToProphet && '不切未卜先知',
+  ].filter(Boolean).join(' · ')
+
   const total = runResult?.result.totalnum ?? 0
   const targetResult = runResult?.result.nodes.at(-1)
   const reached = targetResult?.num ?? 0
@@ -1160,42 +1172,6 @@ const SortieOddsView: React.FC<StateProps> = ({
             { value: 10000, label: '10,000 次（稳）' },
           ]}
         />
-        <HTMLSelect
-          value={targetFormation}
-          onChange={(event) => setTargetFormation(Number(event.currentTarget.value))}
-          options={[
-            {
-              value: 0,
-              label: capabilities?.specialFormations.length
-                ? `目标点阵形：自动（特攻→${formationName(capabilities.specialFormations[0])}）`
-                : '目标点阵形：自动',
-            },
-            ...(snapshot.combinedFlag ? [11, 12, 13, 14] : [1, 2, 3, 4, 5, 6]).map((id) => ({
-              value: id,
-              label: `目标点阵形：${formationName(id)}`,
-            })),
-          ]}
-        />
-        <HTMLSelect
-          value={midFormation}
-          onChange={(event) => setMidFormation(Number(event.currentTarget.value))}
-          options={[
-            { value: 0, label: '道中阵形：自动' },
-            ...(snapshot.combinedFlag ? [11, 12, 13, 14] : [1, 2, 3, 4, 5, 6]).map((id) => ({
-              value: id,
-              label: `道中阵形：${formationName(id)}`,
-            })),
-          ]}
-        />
-        <HTMLSelect
-          value={nightPolicy}
-          onChange={(event) => setNightPolicy(event.currentTarget.value as NightPolicy)}
-          options={[
-            { value: 'always', label: '目标点夜战：总是进（求S）' },
-            { value: 'ifBelowA', label: '目标点夜战：未达A才进' },
-            { value: 'never', label: '目标点夜战：不进' },
-          ]}
-        />
         <Switch
           checked={useSupport && (!!support.normal || !!support.boss)}
           disabled={!support.normal && !support.boss}
@@ -1206,41 +1182,6 @@ const SortieOddsView: React.FC<StateProps> = ({
             : '支援：未出港'}
           onChange={(event) => setUseSupport(event.currentTarget.checked)}
         />
-        {isEventMap && (
-          <HTMLSelect
-            value={bonusDmgAll}
-            onChange={(event) => setBonusDmgAll(Number(event.currentTarget.value))}
-            options={[1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.5, 1.6, 1.75, 2].map(
-              (value) => ({
-                value,
-                label: value === 1 ? '特效倍率：无' : `特效倍率：×${value}`,
-              }),
-            )}
-          />
-        )}
-        {isEventMap && (
-          <HTMLSelect
-            value={debuffDmg}
-            onChange={(event) => setDebuffDmg(Number(event.currentTarget.value))}
-            options={[1, 1.1, 1.15, 1.2, 1.25, 1.3, 1.4, 1.5, 1.75, 2].map((value) => ({
-              value,
-              label: value === 1 ? '破甲：未完成' : `破甲：×${value}`,
-            }))}
-          />
-        )}
-        {smokeCount > 0 && (
-          <HTMLSelect
-            value={smokeEdge}
-            onChange={(event) => setSmokeEdge(Number(event.currentTarget.value))}
-            options={[
-              { value: 0, label: `烟幕（${smokeCount}本）：不使用` },
-              ...battleEdges.map((edge) => ({
-                value: edge.id,
-                label: `烟幕：${edge.to} 点展开`,
-              })),
-            ]}
-          />
-        )}
         <Switch
           checked={useLbas && lbasBaseCount > 0}
           disabled={lbasBaseCount === 0}
@@ -1256,11 +1197,96 @@ const SortieOddsView: React.FC<StateProps> = ({
           label="自动跟随出击并重算"
           onChange={(event) => setAutoAnalyze(event.currentTarget.checked)}
         />
-        <Switch
-          checked={switchToProphet}
-          label="战斗时切到未卜先知"
-          onChange={(event) => setSwitchToProphet(event.currentTarget.checked)}
-        />
+      </div>
+
+      <div className="sortie-odds__muted" style={{ margin: '0 0 10px' }}>
+        <span
+          style={{ cursor: 'pointer', fontWeight: 600 }}
+          onClick={() => setAdvancedOpen(!advancedOpen)}
+        >
+          {advancedOpen ? '▾' : '▸'} 更多设置（阵形 / 夜战策略 / 特效倍率 / 破甲 / 烟幕 / 面板切换）
+          {!advancedOpen && advancedSummary && ` · ${advancedSummary}`}
+        </span>
+        <Collapse isOpen={advancedOpen}>
+          <div className="sortie-odds__controls" style={{ marginTop: 6 }}>
+            <HTMLSelect
+              value={targetFormation}
+              onChange={(event) => setTargetFormation(Number(event.currentTarget.value))}
+              options={[
+                {
+                  value: 0,
+                  label: capabilities?.specialFormations.length
+                    ? `目标点阵形：自动（特攻→${formationName(capabilities.specialFormations[0])}）`
+                    : '目标点阵形：自动',
+                },
+                ...(snapshot.combinedFlag ? [11, 12, 13, 14] : [1, 2, 3, 4, 5, 6]).map((id) => ({
+                  value: id,
+                  label: `目标点阵形：${formationName(id)}`,
+                })),
+              ]}
+            />
+            <HTMLSelect
+              value={midFormation}
+              onChange={(event) => setMidFormation(Number(event.currentTarget.value))}
+              options={[
+                { value: 0, label: '道中阵形：自动' },
+                ...(snapshot.combinedFlag ? [11, 12, 13, 14] : [1, 2, 3, 4, 5, 6]).map((id) => ({
+                  value: id,
+                  label: `道中阵形：${formationName(id)}`,
+                })),
+              ]}
+            />
+            <HTMLSelect
+              value={nightPolicy}
+              onChange={(event) => setNightPolicy(event.currentTarget.value as NightPolicy)}
+              options={[
+                { value: 'always', label: '目标点夜战：总是进（求S）' },
+                { value: 'ifBelowA', label: '目标点夜战：未达A才进' },
+                { value: 'never', label: '目标点夜战：不进' },
+              ]}
+            />
+            {isEventMap && (
+              <HTMLSelect
+                value={bonusDmgAll}
+                onChange={(event) => setBonusDmgAll(Number(event.currentTarget.value))}
+                options={[1, 1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.5, 1.6, 1.75, 2].map(
+                  (value) => ({
+                    value,
+                    label: value === 1 ? '特效倍率：无' : `特效倍率：×${value}`,
+                  }),
+                )}
+              />
+            )}
+            {isEventMap && (
+              <HTMLSelect
+                value={debuffDmg}
+                onChange={(event) => setDebuffDmg(Number(event.currentTarget.value))}
+                options={[1, 1.1, 1.15, 1.2, 1.25, 1.3, 1.4, 1.5, 1.75, 2].map((value) => ({
+                  value,
+                  label: value === 1 ? '破甲：未完成' : `破甲：×${value}`,
+                }))}
+              />
+            )}
+            {smokeCount > 0 && (
+              <HTMLSelect
+                value={smokeEdge}
+                onChange={(event) => setSmokeEdge(Number(event.currentTarget.value))}
+                options={[
+                  { value: 0, label: `烟幕（${smokeCount}本）：不使用` },
+                  ...battleEdges.map((edge) => ({
+                    value: edge.id,
+                    label: `烟幕：${edge.to} 点展开`,
+                  })),
+                ]}
+              />
+            )}
+            <Switch
+              checked={switchToProphet}
+              label="战斗时切到未卜先知"
+              onChange={(event) => setSwitchToProphet(event.currentTarget.checked)}
+            />
+          </div>
+        </Collapse>
       </div>
       {running && <ProgressBar value={progress} animate stripes />}
 
