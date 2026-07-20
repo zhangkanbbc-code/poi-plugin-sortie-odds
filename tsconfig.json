@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "esnext",
+    "types": ["node", "vitest/globals"],
+    "module": "preserve",
+    "jsx": "react-jsx",
+    "strict": true,
+    "moduleResolution": "bundler",
+    "baseUrl": "./",
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "resolveJsonModule": true,
+    "strictNullChecks": true
+  },
+  "include": ["index-src.ts", "src/**/*", "shims/**/*", "tests/**/*"]
+}
