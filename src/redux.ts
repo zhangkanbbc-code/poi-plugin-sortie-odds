@@ -64,6 +64,19 @@ export const initialState: LiveSortieState = (() => {
   return defaultState
 })()
 
+// poi 核心 reducerFactory 对每个插件的 reducer 都套一层
+// combineReducers({ _: reducer })（"用 combineReducers 校验 func 是否合法"），
+// 所以 state.ext[PLUGIN_KEY] 的真实形状是 { _: <本插件 reducer 的状态> }，
+// 不是状态本身——这一层包装在 poi 源码 views/redux/reducer-factory.js 的
+// secureExtensionConfig 里，读 ext state 的地方都必须过这个函数解包，
+// 否则拿到的都是 undefined 字段（Math.max(undefined, x) 会静默产出 NaN）
+export const readOwnLiveState = (
+  ext: Record<string, unknown> | undefined,
+): LiveSortieState | undefined => {
+  const wrapped = ext?.[PLUGIN_KEY] as { _?: LiveSortieState } | undefined
+  return wrapped?._
+}
+
 export const startSortie = (mapId: string, edge: number | null) => ({
   type: START,
   mapId,

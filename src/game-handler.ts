@@ -1,10 +1,11 @@
 import { store } from 'views/create-store'
 
-import { CONFIG_SWITCH_TO_PROPHET, PLUGIN_KEY, PROPHET_PLUGIN_ID } from './constants'
+import { CONFIG_SWITCH_TO_PROPHET, PROPHET_PLUGIN_ID } from './constants'
 import {
   LIVE_CONFIG_PATH,
   appendEdge,
   markBattleStart,
+  readOwnLiveState,
   resetSortie,
   setLbasStrikes,
   settleBattle,
@@ -50,14 +51,14 @@ const toEdge = (value: unknown): number | null => {
   return Number.isFinite(edge) && edge > 0 ? edge : null
 }
 
-type ExtState = { ext?: Record<string, { actualEdges?: number[] } | undefined> }
+type ExtState = { ext?: Record<string, unknown> }
 
 // 记账动作后立刻持久化：poi 重启（api_start2）会清空核心 sortie 状态，
 // 但游戏能中途续走——恢复靠这份存档（见 redux.restoreLiveState）
 const sync = (action: Parameters<typeof store.dispatch>[0]): void => {
   store.dispatch(action)
   try {
-    const live = (store.getState() as ExtState).ext?.[PLUGIN_KEY]
+    const live = readOwnLiveState((store.getState() as ExtState).ext)
     if (live) window.config?.set(LIVE_CONFIG_PATH, live)
   } catch {
     // 配置写失败不阻断游戏事件处理
@@ -135,7 +136,7 @@ const handleGameResponse = (event: Event): void => {
     // poi 中途重启后核心被截断，自有恢复的路径才是全量
     const state = store.getState() as { sortie?: PoiSortieSlice } & ExtState
     const coreTraversed = Math.max(0, (state.sortie?.spotHistory?.length ?? 0) - 1)
-    const ownTraversed = state.ext?.[PLUGIN_KEY]?.actualEdges?.length ?? 0
+    const ownTraversed = readOwnLiveState(state.ext)?.actualEdges.length ?? 0
     const traversed = Math.max(coreTraversed, ownTraversed)
     sync(settleBattle(rank, traversed > 0 ? traversed : undefined))
   }

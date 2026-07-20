@@ -194,6 +194,33 @@ describe('deriveLiveSortie', () => {
     expect(live.completedEdgeCount).toBe(4)
   })
 
+  it('own.completedEdgeCount 畸形（undefined/NaN）时不能让 Math.max 传染成 NaN', () => {
+    // 曾经因读取 poi 核心 ext state 时漏解包 { _: ... } 包装，
+    // own.completedEdgeCount 恒为 undefined，Math.max(undefined, floor) = NaN，
+    // 下游 effectiveRoute.slice(NaN) 被当成 slice(0)：已走节点全部回到剩余模拟
+    const ownUndefined = {
+      ...initialState,
+      active: true,
+      mapId: '62-3',
+      actualEdges: [3, 7, 12, 15, 30],
+      completedEdgeCount: undefined as unknown as number,
+    }
+    const sortie = {
+      sortieMapId: '62-3',
+      sortieStatus: [true, false, false, false],
+      spotHistory: [0, 3, 7, 12, 15, 30],
+    }
+    expect(deriveLiveSortie(ownUndefined, sortie).completedEdgeCount).toBe(4)
+
+    const ownNaN = { ...ownUndefined, completedEdgeCount: NaN }
+    const cleared = {
+      sortieMapId: 0,
+      sortieStatus: [false, false, false, false],
+      spotHistory: [],
+    }
+    expect(deriveLiveSortie(ownNaN, cleared).completedEdgeCount).toBe(4)
+  })
+
   it('中途重启的跟随中，战斗中状态仍从核心 battle 派生', () => {
     const own = { ...initialState, active: true, mapId: '62-3', actualEdges: [3] }
     const cleared = {

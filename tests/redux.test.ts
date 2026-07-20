@@ -4,6 +4,7 @@ import {
   appendEdge,
   initialState,
   markBattleStart,
+  readOwnLiveState,
   reducer,
   restoreLiveState,
   setLbasStrikes,
@@ -104,5 +105,23 @@ describe('restoreLiveState（poi 重启后恢复出击记账）', () => {
       now,
     )
     expect(badEdges.actualEdges).toEqual([])
+  })
+})
+
+describe('readOwnLiveState（poi 核心把每个插件 reducer 包在 { _: ... } 下）', () => {
+  // 根因实锤：views/redux/reducer-factory.js 的 secureExtensionConfig 用
+  // combineReducers({ _: pluginReducer }) 包装每个插件的 reducer 做合法性校验，
+  // 所以 state.ext[PLUGIN_KEY] 真实形状是 { _: <本插件状态> }，不是状态本身
+  it('解包 poi 核心的 { _: ... } 包装', () => {
+    const live = { ...initialState, active: true, mapId: '62-3', actualEdges: [3, 7] }
+    const ext = { 'poi-plugin-sortie-odds': { _: live } }
+    expect(readOwnLiveState(ext)).toEqual(live)
+  })
+
+  it('缺失/形状不对时返回 undefined，不是半个对象', () => {
+    expect(readOwnLiveState(undefined)).toBeUndefined()
+    expect(readOwnLiveState({})).toBeUndefined()
+    // 直接把状态摆在顶层（没有 _ 包装）——不能误当成解包成功
+    expect(readOwnLiveState({ 'poi-plugin-sortie-odds': initialState })).toBeUndefined()
   })
 })

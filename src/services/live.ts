@@ -77,6 +77,14 @@ export const gaugeBandFor = (
     : [info.nowHp, info.maxHp]
 }
 
+// Math.max/min 遇到 NaN（畸形上游数据、undefined 字段）会静默传染成 NaN，
+// 进而让 Array.slice(NaN) 被当成 slice(0)——即"不切片"，把已走节点也塞回剩余模拟。
+// 这条防线只是兜底：真正的数据源必须先保证干净（见 readOwnLiveState 的形状说明）
+const safeCount = (value: unknown): number => {
+  const n = Number(value)
+  return Number.isFinite(n) && n >= 0 ? n : 0
+}
+
 // poi 把海域拼成 `${api_maparea_id}${api_mapinfo_no}` 字符串（如 '15'、'481'）；
 // api_mapinfo_no 恒为个位数，所以末位是图号、其余是海域号
 export const parseSortieMapId = (raw: unknown): string | null => {
@@ -107,7 +115,7 @@ export const deriveLiveSortie = (
       ? battle._status?.battle != null
       : base.battleOngoing
     const completed = Math.max(
-      base.completedEdgeCount,
+      safeCount(base.completedEdgeCount),
       Math.max(0, base.actualEdges.length - 1),
     )
     if (ongoing === base.battleOngoing && completed === base.completedEdgeCount) return base
@@ -124,7 +132,7 @@ export const deriveLiveSortie = (
     // 能走到第 N 个节点说明前 N-1 个节点必然已结算——不依赖事件记账的下界；
     // 自有记账（当前点结算后 = N）更新时取更大值
     completedEdgeCount: Math.max(
-      base.completedEdgeCount,
+      safeCount(base.completedEdgeCount),
       Math.max(0, actualEdges.length - 1),
     ),
     // 核心 battle 状态可用时覆盖自有记账（自有事件监听会错过重载前的战斗包）

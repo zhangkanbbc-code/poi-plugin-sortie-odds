@@ -26,6 +26,7 @@ import {
   PLUGIN_KEY,
   PLUGIN_UA,
 } from '../constants'
+import { readOwnLiveState } from '../redux'
 import { selectCurrentFleet, selectSupportFleets } from '../selectors'
 import {
   buildSimulationInput,
@@ -1358,7 +1359,7 @@ const SortieOddsView: React.FC<StateProps> = ({
 
 const mapStateToProps = (state: PoiRootState): StateProps => {
   const live = deriveLiveSortie(
-    state.ext?.[PLUGIN_KEY] as LiveSortieState | undefined,
+    readOwnLiveState(state.ext),
     state.sortie as PoiSortieSlice | undefined,
     state.battle as PoiBattleSlice | undefined,
   )

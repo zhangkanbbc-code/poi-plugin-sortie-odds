@@ -87,5 +87,10 @@ describe('plugin integrations', () => {
     // 结算记账全丢时也有"前 N-1 点已结算"下界（视图边界兜底）
     expect(completedEdgeCountFromLogs(map, [1, 2], '1-1', 0, null, 0)).toBe(1)
     expect(completedEdgeCountFromLogs(map, [], '1-1', 0, null, 0)).toBe(0)
+    // ownCompletedCount 为 NaN（畸形上游数据）不能让 Math.max/min 传染成 NaN，
+    // 否则调用方 effectiveRoute.slice(NaN) 会被当成 slice(0)，即"整段不切片"
+    expect(completedEdgeCountFromLogs(
+      map, [1, 2, 3, 4, 5], '1-1', NaN as unknown as number, null, 0,
+    )).toBe(4)
   })
 })

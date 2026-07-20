@@ -1,6 +1,6 @@
 {
   "name": "poi-plugin-sortie-odds",
-  "version": "0.8.7",
+  "version": "0.8.8",
   "description": "Estimate route reachability and remaining-sortie S/A odds with Logbook and Prophet settlement data.",
   "main": "index.js",
   "files": [
