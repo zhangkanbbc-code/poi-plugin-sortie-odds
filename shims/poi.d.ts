@@ -14,6 +14,13 @@ declare global {
       sortieMapId?: number | string
       spotHistory?: number[]
     }
+    // views/redux/battle.js：_status.battle 非空 = 战斗进行中
+    battle?: {
+      _status?: {
+        battle?: unknown
+        currentCell?: number
+      }
+    }
     info?: {
       fleets?: Array<{ api_ship?: number[]; api_mission?: number[] }>
       basic?: { api_level?: number }

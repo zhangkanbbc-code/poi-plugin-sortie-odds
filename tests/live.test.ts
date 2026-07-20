@@ -122,6 +122,24 @@ describe('deriveLiveSortie', () => {
     expect(live.completedEdgeCount).toBe(3)
   })
 
+  it('战斗中状态优先取 poi 核心 battle._status.battle（覆盖自有记账）', () => {
+    const sortie = {
+      sortieMapId: '15',
+      sortieStatus: [true, false, false, false],
+      spotHistory: [0, 3, 7],
+    }
+    // 核心说在打（对象非空）——即使自有记账错过了战斗包
+    const fighting = deriveLiveSortie(initialState, sortie, { _status: { battle: {} } })
+    expect(fighting.battleOngoing).toBe(true)
+    // 核心说没在打（进点/结算后清 null）——即使自有记账残留 true
+    const own = { ...initialState, battleOngoing: true }
+    const idle = deriveLiveSortie(own, sortie, { _status: { battle: null } })
+    expect(idle.battleOngoing).toBe(false)
+    // 核心 battle 状态不可用时退回自有记账
+    const fallback = deriveLiveSortie(own, sortie)
+    expect(fallback.battleOngoing).toBe(true)
+  })
+
   it('spotHistory 首位是起点格，会被剔除；0 值边被过滤', () => {
     const live = deriveLiveSortie(initialState, {
       sortieMapId: '25',

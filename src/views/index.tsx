@@ -53,7 +53,7 @@ import {
 import { kcnavTransport } from '../services/kcnav-transport'
 import { deriveLiveSortie, gaugeBandFor, readEventMapInfo } from '../services/live'
 import { mapCache } from '../services/map-cache'
-import type { PoiEventMaps, PoiSortieSlice } from '../services/live'
+import type { PoiBattleSlice, PoiEventMaps, PoiSortieSlice } from '../services/live'
 import {
   getRoutingFleetFeatures,
   routingFeatureLabel,
@@ -1357,6 +1357,7 @@ const mapStateToProps = (state: PoiRootState): StateProps => {
   const live = deriveLiveSortie(
     state.ext?.[PLUGIN_KEY] as LiveSortieState | undefined,
     state.sortie as PoiSortieSlice | undefined,
+    state.battle as PoiBattleSlice | undefined,
   )
   const integration = readPluginIntegrations(state)
   const applied = applyProphetSettlement(

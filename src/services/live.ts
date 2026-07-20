@@ -8,6 +8,16 @@ export interface PoiSortieSlice {
   spotHistory?: number[]
 }
 
+// poi 核心 state.battle（views/redux/battle.js）：
+// _status.battle 在战斗包到达时置对象、battleresult/进点/出击/回港时清 null，
+// 是"战斗进行中"的权威信号（演习不经过该 reducer，不会误报）
+export interface PoiBattleSlice {
+  _status?: {
+    battle?: unknown
+    currentCell?: number
+  }
+}
+
 export interface EventMapInfo {
   difficulty: number
   nowHp: number
@@ -75,11 +85,12 @@ export const parseSortieMapId = (raw: unknown): string | null => {
   return `${text.slice(0, -1)}-${text.slice(-1)}`
 }
 
-// 海域与实际路线以 poi 核心状态为准（不受插件加载时序影响）；
-// 结算记账字段（lastRank/settlementAt/startedAt/completedEdgeCount）仍来自自有 reducer
+// 海域、实际路线与战斗中状态以 poi 核心状态为准（不受插件加载时序影响，
+// 中途重载也不丢）；结算记账字段（lastRank/settlementAt/startedAt）仍来自自有 reducer
 export const deriveLiveSortie = (
   own: LiveSortieState | undefined,
   sortie: PoiSortieSlice | undefined,
+  battle?: PoiBattleSlice,
 ): LiveSortieState => {
   const base = own ?? initialState
   const mapId = parseSortieMapId(sortie?.sortieMapId)
@@ -101,5 +112,9 @@ export const deriveLiveSortie = (
       base.completedEdgeCount,
       Math.max(0, actualEdges.length - 1),
     ),
+    // 核心 battle 状态可用时覆盖自有记账（自有事件监听会错过重载前的战斗包）
+    battleOngoing: battle?._status !== undefined
+      ? battle._status?.battle != null
+      : base.battleOngoing,
   }
 }
