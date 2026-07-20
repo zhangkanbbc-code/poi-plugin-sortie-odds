@@ -203,6 +203,9 @@ export interface SimulationInput {
   fleetSupportB: SimFleetInput | null
   lbas: LbasBaseInput[] | null
   fleetFriendComps: null
+  // 手动预设的友军舰队（单一固定编成，非概率分布）；用户在活动图里照社区
+  // 情报手填舰种+等级，无装备加成（v1 简化，见 adapter.ts buildFriendFleet）
+  fleetFriend?: SimFleetInput | null
   nodes: SimNodeInput[]
   continueOnTaiha: boolean
   retreatOnChuuhaIfAll: number
@@ -247,6 +250,19 @@ export interface FleetInspectResult {
   specialFormations: number[]
   // 本队 TP 容量（S 胜带出量；A 胜 = floor(×0.7)）
   transportS: number
+}
+
+// 友军舰队手动预设的舰船名录条目（来自隐藏 iframe 的 SHIPDATA，见 simulator.ts listShips）
+export interface ShipListEntry {
+  id: number
+  name: string
+  nameJP: string
+}
+
+// 用户手填的友军单舰：舰种+等级，无装备（v1 简化）
+export interface FriendShipSlot {
+  masterId: number
+  level: number
 }
 
 export interface EngineWarning {

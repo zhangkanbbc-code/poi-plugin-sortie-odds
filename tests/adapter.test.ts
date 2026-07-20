@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 
 import {
+  buildFriendFleet,
   buildSimulationInput,
   countSmokeGenerators,
   toEnemyComps,
@@ -234,5 +235,49 @@ describe('simulator adapter', () => {
   it('不传 targetFormation 时沿用启发式阵形', () => {
     const input = buildSimulationInput(snapshot, [{ edge, enemy }], 1000)
     expect(input.nodes[0].formationOverride).toBe(1)
+  })
+
+  it('friendFleet 选项透传到 fleetFriend（未设置时为 null）', () => {
+    const withoutFriend = buildSimulationInput(snapshot, [{ edge, enemy }], 1000)
+    expect(withoutFriend.fleetFriend).toBeNull()
+    const friendFleet = buildFriendFleet([{ masterId: 1, level: 99 }])
+    const withFriend = buildSimulationInput(
+      snapshot,
+      [{ edge, enemy }],
+      1000,
+      { friendFleet },
+    )
+    expect(withFriend.fleetFriend).toEqual(friendFleet)
+  })
+})
+
+describe('buildFriendFleet', () => {
+  it('只给 masterId+LVL，不给 stats——交给模拟器按 SHIPDATA 查表', () => {
+    const fleet = buildFriendFleet([{ masterId: 1, level: 99 }, { masterId: 2, level: 1 }])
+    expect(fleet).toEqual({
+      formation: 1,
+      ships: [
+        { masterId: 1, LVL: 99, equips: [] },
+        { masterId: 2, LVL: 1, equips: [] },
+      ],
+    })
+  })
+
+  it('过滤掉未选择的槽位（masterId<=0）', () => {
+    const fleet = buildFriendFleet([
+      { masterId: 0, level: 99 },
+      { masterId: 5, level: 50 },
+    ])
+    expect(fleet?.ships).toEqual([{ masterId: 5, LVL: 50, equips: [] }])
+  })
+
+  it('等级非法（0/NaN）时兜底为 99', () => {
+    const fleet = buildFriendFleet([{ masterId: 5, level: Number.NaN }])
+    expect(fleet?.ships[0].LVL).toBe(99)
+  })
+
+  it('全部槽位为空时返回 null（不塞一个空舰队进模拟）', () => {
+    expect(buildFriendFleet([])).toBeNull()
+    expect(buildFriendFleet([{ masterId: 0, level: 99 }])).toBeNull()
   })
 })

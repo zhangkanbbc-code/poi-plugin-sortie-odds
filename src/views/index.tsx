@@ -29,6 +29,7 @@ import {
 import { readOwnLiveState } from '../redux'
 import { selectCurrentFleet, selectSupportFleets } from '../selectors'
 import {
+  buildFriendFleet,
   buildSimulationInput,
   countSmokeGenerators,
   toPlayerFleet,
@@ -79,6 +80,7 @@ import type { KcnavStatus } from '../services/kcnav-transport'
 import type {
   EngineRunResult,
   FleetInspectResult,
+  FriendShipSlot,
   KcnavGimmicksPayload,
   KcnavMapPayload,
   LiveSortieState,
@@ -87,6 +89,7 @@ import type {
   RouteEvidence,
   RouteEdge,
   ShipCapability,
+  ShipListEntry,
 } from '../types'
 
 const CSS = `
@@ -266,6 +269,44 @@ const SortieOddsView: React.FC<StateProps> = ({
       return next
     })
   }, [mapId])
+
+  const [friendFleetOpen, setFriendFleetOpen] = usePersistentState('friendFleetOpen', false)
+  const [useFriendFleet, setUseFriendFleet] = usePersistentState('useFriendFleet', false)
+  // 友军舰队手动预设，按海域持久化（同一活动图配一次即可，同 bonusPerShip 模式）
+  const [friendSlots, setFriendSlotsState] = useState<FriendShipSlot[]>([])
+  const [shipList, setShipList] = useState<ShipListEntry[] | null>(null)
+
+  useEffect(() => {
+    const stored = window.config?.get(`plugin.${PLUGIN_KEY}.friendFleet.${mapId}`, [])
+    setFriendSlotsState((stored as FriendShipSlot[] | undefined) ?? [])
+  }, [mapId])
+
+  const setFriendSlot = useCallback((index: number, slot: FriendShipSlot | null) => {
+    setFriendSlotsState((previous) => {
+      const next = [...previous]
+      if (slot) next[index] = slot
+      else next.splice(index, 1)
+      window.config?.set(`plugin.${PLUGIN_KEY}.friendFleet.${mapId}`, next)
+      return next
+    })
+  }, [mapId])
+
+  // 舰船名录较大，展开友军编辑面板时才向隐藏 iframe 查询一次
+  useEffect(() => {
+    if (!friendFleetOpen || shipList) return undefined
+    let disposed = false
+    void simulatorBridge.listShips()
+      .then((ships) => {
+        if (disposed) return
+        setShipList([...ships].sort((a, b) => a.name.localeCompare(b.name)))
+      })
+      .catch(() => {
+        if (!disposed) setShipList([])
+      })
+    return () => {
+      disposed = true
+    }
+  }, [friendFleetOpen, shipList])
 
   const fleetShipRows = useMemo(
     () => snapshot.fleets
@@ -738,6 +779,9 @@ const SortieOddsView: React.FC<StateProps> = ({
           ...(bonusDmgAll !== 1 ? { bonusDmgAll } : {}),
           ...(Object.keys(bonusPerShip).length > 0 ? { bonusPerShip } : {}),
           ...(debuffDmg !== 1 ? { debuffDmg } : {}),
+          ...(useFriendFleet
+            ? { friendFleet: buildFriendFleet(friendSlots) }
+            : {}),
         },
       )
       const result = await simulatorBridge.run(input, (value) => setProgress(value))
@@ -779,11 +823,13 @@ const SortieOddsView: React.FC<StateProps> = ({
     bonusDmgAll,
     bonusPerShip,
     debuffDmg,
+    friendSlots,
     samples,
     smokeEdge,
     snapshot,
     support,
     targetFormation,
+    useFriendFleet,
     useLbas,
     useSupport,
     waitingForChoice,
@@ -1065,6 +1111,72 @@ const SortieOddsView: React.FC<StateProps> = ({
                 />
               ))}
             </div>
+          </Collapse>
+        </div>
+      )}
+
+      {isEventMap && (
+        <div className="sortie-odds__muted" style={{ margin: '0 0 10px' }}>
+          <span
+            style={{ cursor: 'pointer', fontWeight: 600 }}
+            onClick={() => setFriendFleetOpen(!friendFleetOpen)}
+          >
+            {friendFleetOpen ? '▾' : '▸'} 友军舰队（手动预设，按海域记忆
+            {friendSlots.length > 0 ? ` · 已设 ${friendSlots.length} 舰` : ''}）
+          </span>
+          <Collapse isOpen={friendFleetOpen}>
+            <div style={{ margin: '6px 0' }}>
+              <Switch
+                checked={useFriendFleet}
+                label="纳入本次模拟（无社区情报时保持关闭，等同当前无友军）"
+                onChange={(event) => setUseFriendFleet(event.currentTarget.checked)}
+              />
+            </div>
+            {!shipList && <div>舰船名录加载中…</div>}
+            {shipList && shipList.length === 0 && (
+              <div>舰船名录加载失败，可关闭再展开重试。</div>
+            )}
+            {shipList && shipList.length > 0 && (
+              <>
+                <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {Array.from({ length: 6 }, (_, index) => friendSlots[index] ?? null).map(
+                    (slot, index) => (
+                      <div key={index} style={{ display: 'flex', gap: 4, alignItems: 'center' }}>
+                        <HTMLSelect
+                          value={slot?.masterId ?? 0}
+                          onChange={(event) => {
+                            const masterId = Number(event.currentTarget.value)
+                            setFriendSlot(
+                              index,
+                              masterId > 0 ? { masterId, level: slot?.level ?? 99 } : null,
+                            )
+                          }}
+                          options={[
+                            { value: 0, label: `第${index + 1}舰：未选择` },
+                            ...shipList.map((ship) => ({ value: ship.id, label: ship.name })),
+                          ]}
+                        />
+                        {slot && (
+                          <InputGroup
+                            style={{ width: 56 }}
+                            type="number"
+                            value={String(slot.level)}
+                            onChange={(event) => {
+                              const level = Number(event.currentTarget.value)
+                              setFriendSlot(index, { masterId: slot.masterId, level })
+                            }}
+                          />
+                        )}
+                      </div>
+                    ),
+                  )}
+                </div>
+                <div className="sortie-odds__muted">
+                  仅按舰种+等级估算基础数值，不含装备加成；等级默认 99。
+                  编成来自玩家自行整理的社区情报，插件不提供数据源。
+                </div>
+              </>
+            )}
           </Collapse>
         </div>
       )}

@@ -1,5 +1,6 @@
 import { NODE_TYPE } from '../constants'
 import type {
+  FriendShipSlot,
   KcnavEnemyEntry,
   KcnavEnemyPayload,
   KcnavEnemyShip,
@@ -87,6 +88,20 @@ export const toPlayerFleet = (snapshot: PoiFleetSnapshot): SimFleetInput => {
     fleet.shipsC = mapFleet(snapshot.fleets[1] ?? [], snapshot.equips[1] ?? [])
   }
   return fleet
+}
+
+// 友军舰队手动预设：只给 masterId+LVL，不给 stats——模拟器自带按 SHIPDATA
+// 查表+等级插值的兜底路径（sim-interface.js 的 shipInput.stats 分支），
+// 省去在插件里重实现舰娘属性成长公式。v1 不做装备加成，纯基础舰船数值
+export const buildFriendFleet = (slots: FriendShipSlot[]): SimFleetInput | null => {
+  const ships: SimShipInput[] = slots
+    .filter((slot) => slot.masterId > 0)
+    .map((slot) => ({
+      masterId: slot.masterId,
+      LVL: Math.max(1, Math.round(slot.level) || 99),
+      equips: [],
+    }))
+  return ships.length > 0 ? { formation: 1, ships } : null
 }
 
 const shiftedEnemyEquipId = (id: number): number =>
@@ -179,6 +194,8 @@ export interface SimulationBuildOptions {
   bonusPerShip?: Record<number, number>
   // 破甲倍率（仅 boss 点对 boss 旗舰生效，模拟器自动锁定目标）；1 或省略 = 无
   debuffDmg?: number
+  // 友军舰队手动预设（用户按社区情报手填舰种+等级，见 buildFriendFleet）
+  friendFleet?: SimFleetInput | null
 }
 
 const SMOKE_GENERATOR = 500
@@ -277,6 +294,7 @@ export const buildSimulationInput = (
     fleetSupportB: options.supportBoss ?? null,
     lbas: options.lbas ?? null,
     fleetFriendComps: null,
+    fleetFriend: options.friendFleet ?? null,
     nodes,
     continueOnTaiha: false,
     retreatOnChuuhaIfAll: 0,

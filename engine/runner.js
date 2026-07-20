@@ -67,10 +67,30 @@
     })
   }
 
+  // 友军舰队手动预设用的舰船选择列表：只从 window.SHIPDATA 取轻量字段
+  // （id/name/nameJP），不把整份舰船数据库搬进主视图 bundle
+  const handleListShips = (message) => {
+    const data = window.SHIPDATA || {}
+    const ships = Object.keys(data)
+      .map((key) => Number(key))
+      .filter((id) => window.COMMON && window.COMMON.isShipIdPlayable(id))
+      .map((id) => ({ id, name: data[id].name || '', nameJP: data[id].nameJP || '' }))
+      .filter((ship) => ship.name)
+    send({ type: 'result', id: message.id, result: { ships } })
+  }
+
   window.addEventListener('message', (event) => {
     const message = event.data
     if (event.source !== window.parent || message?.source !== 'poi-sortie-odds-plugin') return
     if (!message.id) return
+    if (message.type === 'listShips') {
+      try {
+        handleListShips(message)
+      } catch (error) {
+        send({ type: 'error', id: message.id, error: String(error?.stack || error) })
+      }
+      return
+    }
     if (running) {
       send({ type: 'error', id: message.id, error: '模拟器正忙，请稍后重试' })
       return

@@ -5,6 +5,7 @@ import { ENGINE_MESSAGE_SOURCE } from '../constants'
 import type {
   EngineRunResult,
   FleetInspectResult,
+  ShipListEntry,
   SimFleetInput,
   SimulationInput,
 } from '../types'
@@ -82,7 +83,7 @@ class SimulatorBridge {
   }
 
   private async request<T>(
-    type: 'run' | 'inspect',
+    type: 'run' | 'inspect' | 'listShips',
     input: unknown,
     timeoutMs: number,
     onProgress?: (progress: number) => void,
@@ -120,6 +121,13 @@ class SimulatorBridge {
     formations?: number[]
   }): Promise<FleetInspectResult> {
     return this.request<FleetInspectResult>('inspect', input, 15_000)
+  }
+
+  // 友军舰队手动预设用的舰船名录：直接问隐藏 iframe 里的 SHIPDATA，
+  // 不把整份舰船数据库打进主视图 bundle（见 engine/runner.js 的 handleListShips）
+  async listShips(): Promise<ShipListEntry[]> {
+    const { ships } = await this.request<{ ships: ShipListEntry[] }>('listShips', {}, 15_000)
+    return ships
   }
 
   dispose(): void {
