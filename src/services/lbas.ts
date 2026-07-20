@@ -64,3 +64,16 @@ export const buildLbasInput = (
   })
   return { bases, waves }
 }
+
+// 计划模式（无实际派遣数据）下，把玩家按基地手写的两波目标解析成
+// buildSimulationInput 的 lbasStrikes 形状：外层按基地序号，内层为该基地
+// 命中的节点 edge id 列表。手写值 0 = 跟随目标点（默认全集中打法）。
+// 全部基地都没手动设置时返回 null，交给上层的 targetLbasWaves 兜底
+export const resolveManualLbasStrikes = (
+  waves: number[][],
+  targetEdgeId: number,
+): number[][] | null => {
+  if (!waves.some((row) => row.some((cell) => cell > 0))) return null
+  return waves.map((row) =>
+    row.map((cell) => (cell > 0 ? cell : targetEdgeId)).filter((cell) => cell > 0))
+}

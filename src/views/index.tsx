@@ -34,7 +34,7 @@ import {
   countSmokeGenerators,
   toPlayerFleet,
 } from '../services/adapter'
-import { buildLbasInput } from '../services/lbas'
+import { buildLbasInput, resolveManualLbasStrikes } from '../services/lbas'
 import type { SupportFleets } from '../selectors'
 import type { NightPolicy } from '../services/adapter'
 import { sourceLabel, summarizeResources } from '../services/data-meta'
@@ -319,15 +319,36 @@ const SortieOddsView: React.FC<StateProps> = ({
     [snapshot],
   )
 
-  const lbasBaseCount = useMemo(() => {
+  // 之前 lbasBaseCount 与 runAnalysis 各自单独调用一次 buildLbasInput——
+  // 合并成一份 memo，count 和实际出击都读它
+  const lbasPlan = useMemo(() => {
     const world = Number(mapId.split('-')[0]) || 0
     return buildLbasInput(
       airbase as Parameters<typeof buildLbasInput>[0],
       (equipsById ?? {}) as Parameters<typeof buildLbasInput>[1],
       world,
-    ).bases.length
+    )
   }, [airbase, equipsById, mapId])
+  const lbasBaseCount = lbasPlan.bases.length
   const [manualDifficulty, setManualDifficulty] = useState(0)
+  const [manualLbasOpen, setManualLbasOpen] = usePersistentState('manualLbasOpen', false)
+  // 计划模式下按基地手写两波打击目标，按海域记忆；0 = 跟随目标点（默认行为）
+  const [manualLbasWaves, setManualLbasWavesState] = useState<number[][]>([])
+
+  useEffect(() => {
+    const stored = window.config?.get(`plugin.${PLUGIN_KEY}.lbasWaves.${mapId}`, [])
+    setManualLbasWavesState((stored as number[][] | undefined) ?? [])
+  }, [mapId])
+
+  const setManualLbasWave = useCallback((baseIndex: number, waveIndex: number, edgeId: number) => {
+    setManualLbasWavesState((previous) => {
+      const next = previous.map((row) => [...row])
+      while (next.length <= baseIndex) next.push([0, 0])
+      next[baseIndex][waveIndex] = edgeId
+      window.config?.set(`plugin.${PLUGIN_KEY}.lbasWaves.${mapId}`, next)
+      return next
+    })
+  }, [mapId])
 
   const isEventMap = Number(mapId.split('-')[0]) >= 10
   const autoEvent = useMemo(
@@ -750,11 +771,9 @@ const SortieOddsView: React.FC<StateProps> = ({
         ),
       )
       const chosenFormation = targetFormation || (capabilities?.specialFormations[0] ?? 0)
-      const world = Number(mapId.split('-')[0]) || 0
-      const lbasPlan = buildLbasInput(
-        airbase as Parameters<typeof buildLbasInput>[0],
-        (equipsById ?? {}) as Parameters<typeof buildLbasInput>[1],
-        world,
+      const manualLbasStrikes = resolveManualLbasStrikes(
+        manualLbasWaves,
+        battleEdges.at(-1)?.id ?? 0,
       )
       const input = buildSimulationInput(
         snapshot,
@@ -771,7 +790,9 @@ const SortieOddsView: React.FC<StateProps> = ({
             ? {
               lbas: lbasPlan.bases,
               targetLbasWaves: lbasPlan.waves,
-              lbasStrikes: live.active && live.mapId === mapId ? live.lbasStrikes : null,
+              lbasStrikes: live.active && live.mapId === mapId && live.lbasStrikes
+                ? live.lbasStrikes
+                : manualLbasStrikes,
             }
             : {}),
           ...(smokeEdge > 0 ? { smokeEdgeId: smokeEdge } : {}),
@@ -807,14 +828,15 @@ const SortieOddsView: React.FC<StateProps> = ({
       if (pending) void runRef.current(pending)
     }
   }, [
-    airbase,
     autoEvent,
     battleEdges,
     capabilities,
     difficulty,
     gaugeMode,
     effectiveRoute.length,
-    equipsById,
+    lbasPlan,
+    live,
+    manualLbasWaves,
     mapData,
     mapId,
     midFormation,
@@ -1180,6 +1202,51 @@ const SortieOddsView: React.FC<StateProps> = ({
           </Collapse>
         </div>
       )}
+
+      {lbasBaseCount > 0 && (() => {
+        const realStrikes = live.active && live.mapId === mapId ? live.lbasStrikes : null
+        return (
+          <div className="sortie-odds__muted" style={{ margin: '0 0 10px' }}>
+            <span
+              style={{ cursor: 'pointer', fontWeight: 600 }}
+              onClick={() => setManualLbasOpen(!manualLbasOpen)}
+            >
+              {manualLbasOpen ? '▾' : '▸'} 基地航空队派遣（计划模式，按海域记忆）
+            </span>
+            <Collapse isOpen={manualLbasOpen}>
+              {realStrikes && (
+                <div>已读到实际派遣（{realStrikes.length} 队），下面手动设置暂不生效。</div>
+              )}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, marginTop: 6 }}>
+                {Array.from({ length: lbasBaseCount }, (_, baseIndex) => (
+                  <div key={baseIndex} style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span>第{baseIndex + 1}基地：</span>
+                    {[0, 1].map((waveIndex) => (
+                      <HTMLSelect
+                        key={waveIndex}
+                        value={manualLbasWaves[baseIndex]?.[waveIndex] ?? 0}
+                        onChange={(event) =>
+                          setManualLbasWave(baseIndex, waveIndex, Number(event.currentTarget.value))}
+                        options={[
+                          { value: 0, label: `波${waveIndex + 1}：跟随目标点` },
+                          ...battleEdges.map((edge) => ({
+                            value: edge.id,
+                            label: `波${waveIndex + 1}：${edge.to} 点`,
+                          })),
+                        ]}
+                      />
+                    ))}
+                  </div>
+                ))}
+              </div>
+              <div className="sortie-odds__muted">
+                无法校验航程是否够得到（KCNav 不提供节点距离数据），请自行确认；
+                实际出击时若读到真实派遣，会自动优先于这里的手动设置。
+              </div>
+            </Collapse>
+          </div>
+        )
+      })()}
 
       {isEventMap && gimmickPhases.length > 0 && (
         <Callout intent="primary" style={{ marginBottom: 10 }}>

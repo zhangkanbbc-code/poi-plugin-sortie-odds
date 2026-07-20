@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 
-import { buildLbasInput, detectSupportMissions } from '../src/services/lbas'
+import { buildLbasInput, detectSupportMissions, resolveManualLbasStrikes } from '../src/services/lbas'
 
 describe('detectSupportMissions', () => {
   it('识别道中(33)与决战(34)支援远征', () => {
@@ -75,5 +75,20 @@ describe('buildLbasInput', () => {
   it('无可用基地时返回空', () => {
     expect(buildLbasInput(airbases, equipById, 55)).toEqual({ bases: [], waves: [] })
     expect(buildLbasInput(undefined, equipById, 62)).toEqual({ bases: [], waves: [] })
+  })
+})
+
+describe('resolveManualLbasStrikes', () => {
+  it('全部基地都没手动设置（全 0）时返回 null，交给默认集中打法', () => {
+    expect(resolveManualLbasStrikes([[0, 0], [0, 0]], 99)).toBeNull()
+    expect(resolveManualLbasStrikes([], 99)).toBeNull()
+  })
+
+  it('只要有一个基地手动设置，其余未设置的波次都解析为目标点边号', () => {
+    expect(resolveManualLbasStrikes([[5, 0], [0, 0]], 99)).toEqual([[5, 99], [99, 99]])
+  })
+
+  it('手写的具体边号原样保留', () => {
+    expect(resolveManualLbasStrikes([[12, 14], [12, 12]], 99)).toEqual([[12, 14], [12, 12]])
   })
 })
