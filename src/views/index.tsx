@@ -243,6 +243,35 @@ const SortieOddsView: React.FC<StateProps> = ({
   const [debuffDmg, setDebuffDmg] = usePersistentState('debuffDmg', 1)
   const [switchToProphet, setSwitchToProphet] = usePersistentState('switchToProphet', true)
   const [midFormation, setMidFormation] = usePersistentState('midFormation', 0)
+  const [bonusShipOpen, setBonusShipOpen] = usePersistentState('bonusShipOpen', false)
+  // 逐舰特效倍率，按海域持久化（同一活动图配一次即可）
+  const [bonusPerShip, setBonusPerShipState] = useState<Record<number, number>>({})
+
+  useEffect(() => {
+    const stored = window.config?.get(`plugin.${PLUGIN_KEY}.bonusShip.${mapId}`, {})
+    setBonusPerShipState((stored as Record<number, number> | undefined) ?? {})
+  }, [mapId])
+
+  const setShipBonus = useCallback((masterId: number, value: number) => {
+    setBonusPerShipState((previous) => {
+      const next = { ...previous }
+      if (value === 0) delete next[masterId]
+      else next[masterId] = value
+      window.config?.set(`plugin.${PLUGIN_KEY}.bonusShip.${mapId}`, next)
+      return next
+    })
+  }, [mapId])
+
+  const fleetShipRows = useMemo(
+    () => snapshot.fleets
+      .flat()
+      .filter((entry): entry is NonNullable<typeof entry> => entry != null)
+      .map(([raw, master]) => ({
+        masterId: raw.api_ship_id,
+        name: master.api_name ?? `#${raw.api_ship_id}`,
+      })),
+    [snapshot],
+  )
 
   const lbasBaseCount = useMemo(() => {
     const world = Number(mapId.split('-')[0]) || 0
@@ -660,6 +689,7 @@ const SortieOddsView: React.FC<StateProps> = ({
           ...(smokeEdge > 0 ? { smokeEdgeId: smokeEdge } : {}),
           ...(midFormation > 0 ? { midFormation } : {}),
           ...(bonusDmgAll !== 1 ? { bonusDmgAll } : {}),
+          ...(Object.keys(bonusPerShip).length > 0 ? { bonusPerShip } : {}),
           ...(debuffDmg !== 1 ? { debuffDmg } : {}),
         },
       )
@@ -695,6 +725,7 @@ const SortieOddsView: React.FC<StateProps> = ({
     nightPolicy,
     prophetBattleActive,
     bonusDmgAll,
+    bonusPerShip,
     debuffDmg,
     samples,
     smokeEdge,
@@ -911,6 +942,35 @@ const SortieOddsView: React.FC<StateProps> = ({
           机制判定（与模拟同源）：{capabilityText(capabilities, snapshot) || '本队无先制反潜 / 对空CI / 弹观 / 特攻'}
           {capabilities.specialFormations.length > 0
             && ` — 特攻需 ${capabilities.specialFormations.map(formationName).join(' / ')}，阵形「自动」已按此选择`}
+        </div>
+      )}
+
+      {isEventMap && fleetShipRows.length > 0 && (
+        <div className="sortie-odds__muted" style={{ margin: '0 0 10px' }}>
+          <span
+            style={{ cursor: 'pointer', fontWeight: 600 }}
+            onClick={() => setBonusShipOpen(!bonusShipOpen)}
+          >
+            {bonusShipOpen ? '▾' : '▸'} 逐舰特效倍率（覆盖全队默认 ×{bonusDmgAll}，按海域记忆
+            {Object.keys(bonusPerShip).length > 0 ? ` · 已设 ${Object.keys(bonusPerShip).length} 舰` : ''}）
+          </span>
+          <Collapse isOpen={bonusShipOpen}>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 6 }}>
+              {fleetShipRows.map((row, index) => (
+                <HTMLSelect
+                  key={`${row.masterId}-${index}`}
+                  value={bonusPerShip[row.masterId] ?? 0}
+                  onChange={(event) => setShipBonus(row.masterId, Number(event.currentTarget.value))}
+                  options={[
+                    { value: 0, label: `${row.name}：跟随全队` },
+                    ...[1.05, 1.1, 1.15, 1.2, 1.25, 1.3, 1.35, 1.4, 1.5, 1.6, 1.75, 2].map(
+                      (value) => ({ value, label: `${row.name}：×${value}` }),
+                    ),
+                  ]}
+                />
+              ))}
+            </div>
+          </Collapse>
         </div>
       )}
 

@@ -173,8 +173,10 @@ export interface SimulationBuildOptions {
   lbasStrikes?: number[][] | null
   // 在此边展开烟幕（一次出击只能放一次，由模拟器内部保证）
   smokeEdgeId?: number
-  // 活动特效倍率（全队全程）；1 或省略 = 无
+  // 活动特效倍率（全队默认值）；1 或省略 = 无
   bonusDmgAll?: number
+  // 逐舰特效倍率（masterId → 倍率），覆盖全队默认值
+  bonusPerShip?: Record<number, number>
   // 破甲倍率（仅 boss 点对 boss 旗舰生效，模拟器自动锁定目标）；1 或省略 = 无
   debuffDmg?: number
 }
@@ -219,14 +221,18 @@ export const buildSimulationInput = (
   const fleetF = toPlayerFleet(snapshot)
   const combined = !!fleetF.shipsC?.length
 
-  const bonusDmg = Number(options.bonusDmgAll ?? 1)
+  const bonusDmgAll = Number(options.bonusDmgAll ?? 1)
+  const bonusPerShip = options.bonusPerShip ?? {}
   const debuffDmg = Number(options.debuffDmg ?? 1)
-  if (bonusDmg !== 1 || debuffDmg !== 1) {
-    const applyBonuses = (ship: SimShipInput): SimShipInput => ({
-      ...ship,
-      ...(bonusDmg !== 1 ? { bonuses: { bonusDmg } } : {}),
-      ...(debuffDmg !== 1 ? { bonusesDebuff: { bonusDmg: debuffDmg } } : {}),
-    })
+  if (bonusDmgAll !== 1 || debuffDmg !== 1 || Object.keys(bonusPerShip).length > 0) {
+    const applyBonuses = (ship: SimShipInput): SimShipInput => {
+      const bonusDmg = Number(bonusPerShip[ship.masterId] ?? bonusDmgAll)
+      return {
+        ...ship,
+        ...(bonusDmg !== 1 ? { bonuses: { bonusDmg } } : {}),
+        ...(debuffDmg !== 1 ? { bonusesDebuff: { bonusDmg: debuffDmg } } : {}),
+      }
+    }
     fleetF.ships = fleetF.ships.map(applyBonuses)
     if (fleetF.shipsC) fleetF.shipsC = fleetF.shipsC.map(applyBonuses)
   }

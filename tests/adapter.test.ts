@@ -146,6 +146,23 @@ describe('simulator adapter', () => {
     expect(input.nodes[2].formationOverride).toBe(1)
   })
 
+  it('逐舰特效倍率覆盖全队默认值', () => {
+    const input = buildSimulationInput(snapshot, [{ edge, enemy }], 1000, {
+      bonusDmgAll: 1.1,
+      bonusPerShip: { 1: 1.4 },
+    })
+    // 夹具舰 masterId=1，命中逐舰表
+    expect(input.fleetF.ships[0].bonuses).toEqual({ bonusDmg: 1.4 })
+  })
+
+  it('逐舰表未覆盖的舰用全队默认值', () => {
+    const input = buildSimulationInput(snapshot, [{ edge, enemy }], 1000, {
+      bonusDmgAll: 1.1,
+      bonusPerShip: { 999: 1.4 },
+    })
+    expect(input.fleetF.ships[0].bonuses).toEqual({ bonusDmg: 1.1 })
+  })
+
   it('特效倍率与破甲倍率逐舰注入', () => {
     const input = buildSimulationInput(snapshot, [{ edge, enemy }], 1000, {
       bonusDmgAll: 1.2,
