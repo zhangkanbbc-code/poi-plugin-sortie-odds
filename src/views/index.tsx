@@ -24,6 +24,7 @@ import {
   KCNAV_BASE_URL,
   NODE_TYPE,
   PLUGIN_KEY,
+  PLUGIN_UA,
 } from '../constants'
 import { selectCurrentFleet, selectSupportFleets } from '../selectors'
 import {
@@ -1282,7 +1283,8 @@ const SortieOddsView: React.FC<StateProps> = ({
       )}
 
       <Callout style={{ marginTop: 12 }}>
-        v0.4 起 KCNav 请求全程串行节流；收到自动化拒绝会自动熔断并只用本地数据，可用「试探一次」恢复。
+        <strong>{PLUGIN_UA.split('/')[1] ?? ''}</strong> ·
+        KCNav 请求全程串行节流；收到自动化拒绝会自动熔断并只用本地数据，可用「试探一次」恢复。
         通常图与活动图的数据都会保存本地缓存（活动图敌编成 12 小时、地图 24 小时后自动刷新）。
         打完的节点会从后续模拟中移除，并优先采用未卜先知推演出的战后 HP。
         支援舰队、基地航空队、友军、活动特效与漩涡消耗尚未接入，当前结果仍是基线估计。
