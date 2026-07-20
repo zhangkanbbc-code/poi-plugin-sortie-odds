@@ -19,7 +19,6 @@ import {
 } from '@blueprintjs/core'
 
 import {
-  CONFIG_SWITCH_TO_PROPHET,
   ENEMY_NODE_TYPES,
   KCNAV_BASE_URL,
   NODE_TYPE,
@@ -127,6 +126,22 @@ const formatPercent = (value: number): string =>
 // 非出击状态的兜底必须是稳定引用，否则依赖它的 useMemo/useEffect 每次渲染都会重跑
 const EMPTY_EDGES: number[] = []
 
+// 持久化到 poi config 的设置项（重启不丢）
+function usePersistentState<T>(
+  key: string,
+  defaultValue: T,
+): [T, (next: T) => void] {
+  const [value, setValue] = useState<T>(() => {
+    const stored = window.config?.get(`plugin.${PLUGIN_KEY}.${key}`, defaultValue)
+    return (stored as T | undefined) ?? defaultValue
+  })
+  const set = useCallback((next: T) => {
+    setValue(next)
+    window.config?.set(`plugin.${PLUGIN_KEY}.${key}`, next)
+  }, [key])
+  return [value, set]
+}
+
 const FORMATION_NAMES = new Map<number, string>([
   [1, '单纵'],
   [2, '复纵'],
@@ -199,8 +214,8 @@ const SortieOddsView: React.FC<StateProps> = ({
   const [mapData, setMapData] = useState<KcnavMapPayload | null>(null)
   const [target, setTarget] = useState('')
   const [selectedRoute, setSelectedRoute] = useState('')
-  const [samples, setSamples] = useState(5000)
-  const [autoAnalyze, setAutoAnalyze] = useState(true)
+  const [samples, setSamples] = usePersistentState('samples', 5000)
+  const [autoAnalyze, setAutoAnalyze] = usePersistentState('autoAnalyze', true)
   const [mapLoading, setMapLoading] = useState(false)
   const [running, setRunning] = useState(false)
   const [progress, setProgress] = useState(0)
@@ -218,15 +233,13 @@ const SortieOddsView: React.FC<StateProps> = ({
   const [snapshotDate, setSnapshotDate] = useState<string | null>(null)
   const [capabilities, setCapabilities] = useState<FleetInspectResult | null>(null)
   const [targetFormation, setTargetFormation] = useState(0)
-  const [nightPolicy, setNightPolicy] = useState<NightPolicy>('always')
-  const [useSupport, setUseSupport] = useState(true)
-  const [useLbas, setUseLbas] = useState(true)
+  const [nightPolicy, setNightPolicy] = usePersistentState<NightPolicy>('nightPolicy', 'always')
+  const [useSupport, setUseSupport] = usePersistentState('useSupport', true)
+  const [useLbas, setUseLbas] = usePersistentState('useLbas', true)
   const [smokeEdge, setSmokeEdge] = useState(0)
-  const [bonusDmgAll, setBonusDmgAll] = useState(1)
-  const [debuffDmg, setDebuffDmg] = useState(1)
-  const [switchToProphet, setSwitchToProphet] = useState(
-    () => window.config?.get(CONFIG_SWITCH_TO_PROPHET, true) !== false,
-  )
+  const [bonusDmgAll, setBonusDmgAll] = usePersistentState('bonusDmgAll', 1)
+  const [debuffDmg, setDebuffDmg] = usePersistentState('debuffDmg', 1)
+  const [switchToProphet, setSwitchToProphet] = usePersistentState('switchToProphet', true)
 
   const lbasBaseCount = useMemo(() => {
     const world = Number(mapId.split('-')[0]) || 0
@@ -246,7 +259,7 @@ const SortieOddsView: React.FC<StateProps> = ({
   // 游戏内已选难度是权威；读不到（未开图/计划模式）才用手动选择
   const difficulty = isEventMap ? (autoEvent?.difficulty ?? manualDifficulty) : 0
   // 敌形态筛选：auto=按当前血量取斩杀/通常形态样本；all=不过滤
-  const [gaugeMode, setGaugeMode] = useState<'auto' | 'all'>('auto')
+  const [gaugeMode, setGaugeMode] = usePersistentState<'auto' | 'all'>('gaugeMode', 'auto')
   const gaugeNum = isEventMap ? (autoEvent?.gaugeNum ?? 0) : 0
   const gaugeBand = isEventMap && gaugeMode === 'auto' ? gaugeBandFor(autoEvent) : null
   const runGeneration = useRef(0)
@@ -1073,11 +1086,7 @@ const SortieOddsView: React.FC<StateProps> = ({
         <Switch
           checked={switchToProphet}
           label="战斗时切到未卜先知"
-          onChange={(event) => {
-            const checked = event.currentTarget.checked
-            setSwitchToProphet(checked)
-            window.config?.set(CONFIG_SWITCH_TO_PROPHET, checked)
-          }}
+          onChange={(event) => setSwitchToProphet(event.currentTarget.checked)}
         />
       </div>
       {running && <ProgressBar value={progress} animate stripes />}

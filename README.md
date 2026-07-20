@@ -59,6 +59,12 @@
 带路核验会把“同类编成有历史记录”标为通常可达，但不会把样本缺失误报成必沟；联动插件不可用时会回退到 poi 原始结算事件和当前舰队数据。
 解密进度游戏 API 不暴露，开路未完成时以游戏内实际带路为准。
 
+## 安装
+
+从 [Releases](https://github.com/zhangkanbbc-code/poi-plugin-sortie-odds/releases) 下载最新 tgz，
+在 poi 设置 → 插件 → 安装本地插件包 中选择该文件即可。
+建议同时安装 poi-plugin-prophet（未卜先知）与 poi-plugin-akashic-records（航海日志）以启用联动。
+
 ## 开发
 
 ```powershell
