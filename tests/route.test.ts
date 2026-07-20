@@ -145,6 +145,11 @@ describe('multi-start maps', () => {
     expect(buildRouteChoices(multiStartMap, [3], 'Z')).toEqual([[3, 4]])
   })
 
+  it('前缀中段有 KCNav 未收录的边时仍以最后一条边锚定当前位置', () => {
+    // 999 不在地图数据里（能动分歧等特殊边），但最后的 3 号边在 → 当前在 B
+    expect(buildRouteChoices(multiStartMap, [999, 3], 'Z')).toEqual([[999, 3, 4]])
+  })
+
   it('routeLabel 按路线实际起点渲染', () => {
     expect(routeLabel(multiStartMap, [3, 4])).toBe('2 → B → Z')
     expect(routeLabel(multiStartMap, [1, 2])).toBe('1 → A → Z')

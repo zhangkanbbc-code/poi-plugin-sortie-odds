@@ -73,25 +73,19 @@ export const buildRouteChoices = (
 ): number[][] => {
   const edgeMap = getEdgeMap(map)
   const starts = getStartNodes(map)
-  // 实战中以第一条实际边的出发点为锚（多起点图由此自动锁定真实起点）
-  const anchorStart = actualEdges.length
-    ? (edgeMap.get(actualEdges[0])?.from ?? null)
-    : null
-
-  if (anchorStart) {
-    const validActual: number[] = []
-    let current = anchorStart
-    for (const edgeId of actualEdges) {
-      const edge = edgeMap.get(edgeId)
-      if (!edge || edge.from !== current) break
-      validActual.push(edgeId)
-      current = edge.to
+  // 实战中以最后一条实际边的终点为"当前位置"——实际走过的边不需要逐链校验
+  // （能动分歧等特殊边可能不在 KCNav 拓扑里），游戏走过即事实
+  if (actualEdges.length > 0) {
+    const lastEdge = edgeMap.get(actualEdges[actualEdges.length - 1])
+    if (lastEdge) {
+      const current = lastEdge.to
+      if (current === target) return [actualEdges]
+      return enumeratePaths(map, current, target, limit).map((suffix) => [
+        ...actualEdges,
+        ...suffix,
+      ])
     }
-    if (current === target) return [validActual]
-    return enumeratePaths(map, current, target, limit).map((suffix) => [
-      ...validActual,
-      ...suffix,
-    ])
+    // 最后一条边也不认识 → 落到计划模式全起点枚举
   }
 
   // 计划模式：从所有起点枚举

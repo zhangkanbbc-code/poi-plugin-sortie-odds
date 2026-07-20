@@ -1145,7 +1145,9 @@ const SortieOddsView: React.FC<StateProps> = ({
           </div>
 
           {isEventMap && autoEvent && total > 0
-            && (runResult.result.totalTransport ?? 0) > 0 && (() => {
+            && (runResult.result.totalTransport ?? 0) > 0
+            && (autoEvent.gaugeType === 3 || (capabilities?.transportS ?? 0) >= 20)
+            && (() => {
             const avgTp = (runResult.result.totalTransport ?? 0) / total
             const tpS = capabilities?.transportS ?? 0
             const tpA = Math.floor(tpS * 0.7)
