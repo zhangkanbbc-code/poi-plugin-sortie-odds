@@ -420,7 +420,7 @@ const SortieOddsView: React.FC<StateProps> = ({
   const actualEdgesKey = actualEdges.join(',')
   const routeChoices = useMemo(
     () => (mapData && target ? buildRouteChoices(mapData, actualEdges, target) : []),
-    [actualEdges, mapData, target],
+    [actualEdgesKey, mapData, target],
   )
   const [edgeSamples, setEdgeSamples] = useState<Record<number, number>>({})
 
@@ -526,7 +526,7 @@ const SortieOddsView: React.FC<StateProps> = ({
     if (!mapData) return routeChoices
     const ignore = new Set(actualEdges)
     return rankRoutesByTraffic(mapData, routeChoices, compCounts ?? edgeSamples, ignore)
-  }, [actualEdges, compCounts, edgeSamples, mapData, routeChoices])
+  }, [actualEdgesKey, compCounts, edgeSamples, mapData, routeChoices])
 
   // 本次出击内手动选过目标就不再自动改（新出击/换图重置）
   const manualTargetRef = useRef(false)
@@ -565,7 +565,7 @@ const SortieOddsView: React.FC<StateProps> = ({
         Number(live.startedAt ?? 0),
       )
       : 0,
-    [actualEdges, integration.latestAkashic, live.active, live.completedEdgeCount, live.mapId, live.startedAt, mapData, mapId],
+    [actualEdgesKey, integration.latestAkashic, live.active, live.completedEdgeCount, live.mapId, live.startedAt, mapData, mapId],
   )
   const remainingRoute = useMemo(
     () => effectiveRoute.slice(Math.min(completedEdgeCount, effectiveRoute.length)),

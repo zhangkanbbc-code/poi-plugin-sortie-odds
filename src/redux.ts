@@ -6,7 +6,6 @@ const EDGE = `@@${PLUGIN_KEY}/edge`
 const RESET = `@@${PLUGIN_KEY}/reset`
 const SETTLEMENT = `@@${PLUGIN_KEY}/settlement`
 const LBAS_STRIKES = `@@${PLUGIN_KEY}/lbas-strikes`
-const BATTLE_START = `@@${PLUGIN_KEY}/battle-start`
 
 const defaultState: LiveSortieState = {
   active: false,
@@ -18,6 +17,8 @@ const defaultState: LiveSortieState = {
   settlementAt: 0,
   updatedAt: 0,
   lbasStrikes: null,
+  // 恒为 false 占位——真实值只由 deriveLiveSortie 从核心 state.battle 派生
+  // （该 reducer 不再自行记账战斗中状态，见 services/live.ts 的注释）
   battleOngoing: false,
 }
 
@@ -94,7 +95,6 @@ export const settleBattle = (rank: string, completedEdges?: number) => ({
   rank,
   completedEdges,
 })
-export const markBattleStart = () => ({ type: BATTLE_START })
 
 type SortieAction =
   | ReturnType<typeof startSortie>
@@ -102,7 +102,6 @@ type SortieAction =
   | ReturnType<typeof resetSortie>
   | ReturnType<typeof settleBattle>
   | ReturnType<typeof setLbasStrikes>
-  | ReturnType<typeof markBattleStart>
   | { type: string }
 
 export const reducer = (
@@ -130,8 +129,6 @@ export const reducer = (
       const strikes = action as ReturnType<typeof setLbasStrikes>
       return { ...state, lbasStrikes: strikes.strikes, updatedAt: Date.now() }
     }
-    case BATTLE_START:
-      return state.battleOngoing ? state : { ...state, battleOngoing: true, updatedAt: Date.now() }
     case SETTLEMENT: {
       const settlement = action as ReturnType<typeof settleBattle>
       return {
@@ -144,7 +141,6 @@ export const reducer = (
         lastRank: settlement.rank,
         settlementAt: Date.now(),
         updatedAt: Date.now(),
-        battleOngoing: false,
       }
     }
     case EDGE: {
@@ -155,7 +151,6 @@ export const reducer = (
         active: true,
         actualEdges: [...state.actualEdges, next.edge],
         updatedAt: Date.now(),
-        battleOngoing: false,
       }
     }
     case RESET:

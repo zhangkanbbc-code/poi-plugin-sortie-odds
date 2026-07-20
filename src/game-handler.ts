@@ -4,7 +4,6 @@ import { CONFIG_SWITCH_TO_PROPHET, PROPHET_PLUGIN_ID } from './constants'
 import {
   LIVE_CONFIG_PATH,
   appendEdge,
-  markBattleStart,
   readOwnLiveState,
   resetSortie,
   setLbasStrikes,
@@ -12,7 +11,6 @@ import {
   startSortie,
 } from './redux'
 import { simulatorBridge } from './services/simulator'
-import type { PoiSortieSlice } from './services/live'
 
 interface MapResponseBody {
   api_maparea_id?: number
@@ -51,14 +49,12 @@ const toEdge = (value: unknown): number | null => {
   return Number.isFinite(edge) && edge > 0 ? edge : null
 }
 
-type ExtState = { ext?: Record<string, unknown> }
-
 // 记账动作后立刻持久化：poi 重启（api_start2）会清空核心 sortie 状态，
 // 但游戏能中途续走——恢复靠这份存档（见 redux.restoreLiveState）
 const sync = (action: Parameters<typeof store.dispatch>[0]): void => {
   store.dispatch(action)
   try {
-    const live = readOwnLiveState((store.getState() as ExtState).ext)
+    const live = readOwnLiveState(store.getState().ext)
     if (live) window.config?.set(LIVE_CONFIG_PATH, live)
   } catch {
     // 配置写失败不阻断游戏事件处理
@@ -94,12 +90,6 @@ const handleGameResponse = (event: Event): void => {
 
   switchToProphetOnBattle(path)
 
-  // 战斗中标记：首个战斗包置位，battleresult/进点/回港清除（见 redux 各 case）。
-  // 重算门控靠它精确暂停在"开打→结算"区间，而不是整个"到点→结算"
-  if (BATTLE_PATH.test(path) && !NON_BATTLE_SUFFIX.test(path)) {
-    store.dispatch(markBattleStart())
-  }
-
   if (path === '/kcsapi/api_port/port') {
     sync(resetSortie())
     return
@@ -134,7 +124,7 @@ const handleGameResponse = (event: Event): void => {
     if (!rank) return
     // 完成边数取核心 spotHistory 与自有记账的较大值：
     // poi 中途重启后核心被截断，自有恢复的路径才是全量
-    const state = store.getState() as { sortie?: PoiSortieSlice } & ExtState
+    const state = store.getState()
     const coreTraversed = Math.max(0, (state.sortie?.spotHistory?.length ?? 0) - 1)
     const ownTraversed = readOwnLiveState(state.ext)?.actualEdges.length ?? 0
     const traversed = Math.max(coreTraversed, ownTraversed)

@@ -79,8 +79,9 @@ export const gaugeBandFor = (
 
 // Math.max/min 遇到 NaN（畸形上游数据、undefined 字段）会静默传染成 NaN，
 // 进而让 Array.slice(NaN) 被当成 slice(0)——即"不切片"，把已走节点也塞回剩余模拟。
-// 这条防线只是兜底：真正的数据源必须先保证干净（见 readOwnLiveState 的形状说明）
-const safeCount = (value: unknown): number => {
+// 这条防线只是兜底：真正的数据源必须先保证干净（见 readOwnLiveState 的形状说明）。
+// 导出给 integration.ts 复用，避免同一条 NaN 防线在多处各写一份
+export const safeCount = (value: unknown): number => {
   const n = Number(value)
   return Number.isFinite(n) && n >= 0 ? n : 0
 }
@@ -108,12 +109,10 @@ export const deriveLiveSortie = (
   if (!inSortie) {
     if (!base.active) return base
     // 自有记账仍在出击中：核心清零视为"重启后续走"，保持跟随；
-    // 战斗中状态仍从核心 battle 派生（它在重启后照常工作）。
+    // 战斗中状态纯从核心 battle 派生（它在重启后照常工作，是内置 reducer 不受插件加载时序影响）。
     // "能走到第 N 点说明前 N-1 点已结算"的下界在此分支同样必须成立，
     // 否则结算事件缺漏时会把已打完的节点重新算进剩余模拟
-    const ongoing = battle?._status !== undefined
-      ? battle._status?.battle != null
-      : base.battleOngoing
+    const ongoing = battle?._status?.battle != null
     const completed = Math.max(
       safeCount(base.completedEdgeCount),
       Math.max(0, base.actualEdges.length - 1),
@@ -135,9 +134,7 @@ export const deriveLiveSortie = (
       safeCount(base.completedEdgeCount),
       Math.max(0, actualEdges.length - 1),
     ),
-    // 核心 battle 状态可用时覆盖自有记账（自有事件监听会错过重载前的战斗包）
-    battleOngoing: battle?._status !== undefined
-      ? battle._status?.battle != null
-      : base.battleOngoing,
+    // 战斗中状态纯从核心 battle 派生——它是内置 reducer，天然不受插件加载时序影响
+    battleOngoing: battle?._status?.battle != null,
   }
 }

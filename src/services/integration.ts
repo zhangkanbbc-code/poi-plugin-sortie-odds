@@ -1,3 +1,4 @@
+import { safeCount } from './live'
 import { getEdgeMap } from './route'
 import type {
   AkashicSettlement,
@@ -113,11 +114,9 @@ export const completedEdgeCountFromLogs = (
 ): number => {
   // 上钳：结算数不可能超过已走边数；下界：能走到第 N 点说明前 N-1 点已结算。
   // 下界在视图边界再兜一次底，任何来源的结算缺漏都不会把已打完的节点算回剩余模拟。
-  // Number() 兜 NaN/非数值：NaN 一旦混入 Math.max/min 会静默传染，
-  // 下游 Array.slice(NaN) 被当成 slice(0)（不切片），已走节点会重新出现在剩余模拟里
-  const safeOwn = Number.isFinite(Number(ownCompletedCount)) ? Number(ownCompletedCount) : 0
+  // safeCount 兜 NaN/非数值（同一条 NaN 防线，见 live.ts 的说明，不在此重写一份）
   let completed = Math.max(
-    Math.min(safeOwn, actualEdges.length),
+    Math.min(safeCount(ownCompletedCount), actualEdges.length),
     actualEdges.length - 1,
   )
   if (!settlement || settlement.mapId !== mapId || settlement.timestamp < notBefore) return completed
