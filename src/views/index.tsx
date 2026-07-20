@@ -849,10 +849,8 @@ const SortieOddsView: React.FC<StateProps> = ({
             {autoEvent.gaugeNum > 0 && ` · 第${autoEvent.gaugeNum}条`}
             {autoEvent.maxHp > 0
               && ` · ${autoEvent.gaugeType === 3 ? 'TP' : '血条'} ${
-                autoEvent.gaugeType === 3
-                  ? `${autoEvent.nowHp}/${autoEvent.maxHp}`
-                  : `${Math.round((autoEvent.nowHp / autoEvent.maxHp) * 100)}%`
-              }`}
+                Math.round((autoEvent.nowHp / autoEvent.maxHp) * 100)
+              }%（${autoEvent.nowHp}/${autoEvent.maxHp}）`}
           </Tag>
         )}
         {isEventMap && !autoEvent && (
@@ -1107,7 +1105,8 @@ const SortieOddsView: React.FC<StateProps> = ({
             </Card>
           </div>
 
-          {isEventMap && autoEvent?.gaugeType === 3 && total > 0 && (() => {
+          {isEventMap && autoEvent && total > 0
+            && (runResult.result.totalTransport ?? 0) > 0 && (() => {
             const avgTp = (runResult.result.totalTransport ?? 0) / total
             const tpS = capabilities?.transportS ?? 0
             const tpA = Math.floor(tpS * 0.7)
@@ -1125,7 +1124,8 @@ const SortieOddsView: React.FC<StateProps> = ({
                 （S {formatPercent(total ? rankS / total : Number.NaN)}
                 ×{tpS > 0 ? tpS : '全额'} + A {formatPercent(total ? rankA / total : Number.NaN)}
                 ×{tpS > 0 ? tpA : '7成'} + B以下 {formatPercent(total ? rankBelow / total : Number.NaN)}×0）
-                {runsLeft > 0 && ` ｜ 剩余 ${autoEvent.nowHp} TP 预计还需 ${runsLeft} 次`}
+                {runsLeft > 0
+                  && ` ｜ 按剩余条值 ${autoEvent.nowHp} 折算预计还需 ${runsLeft} 次`}
               </div>
             )
           })()}
