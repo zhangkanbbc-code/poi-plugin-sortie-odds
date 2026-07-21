@@ -29,6 +29,9 @@ describe('kcnav-transport', () => {
   })
   afterEach(() => vi.useRealTimers())
 
+  // 默认 5000ms 超时在 GitHub Actions 的共享跑者上偶发不够——本地从未复现过，
+  // 逻辑本身是确定性的（random: () => 0 把间隔钉死在 1500ms），
+  // 只是 flushIO() 的多轮真实 setImmediate 在跑者慢的时候偶尔吃满预算
   it('串行执行并保持 ≥1.5s 间隔，interactive 插队', async () => {
     const calls: Array<{ url: string; at: number }> = []
     const transport = createKcnavTransport({
@@ -52,7 +55,7 @@ describe('kcnav-transport', () => {
     expect(calls.map((call) => call.url)).toEqual(['b1', 'i1', 'b2'])
     expect(calls[1].at - calls[0].at).toBeGreaterThanOrEqual(1500)
     expect(calls[2].at - calls[1].at).toBeGreaterThanOrEqual(1500)
-  })
+  }, 20_000)
 
   it('401 automation 触发 6h 熔断、持久化，期间请求即拒不发包', async () => {
     const statePath = await newStatePath()
@@ -91,6 +94,7 @@ describe('kcnav-transport', () => {
     await expect(second.request('u2')).rejects.toBeInstanceOf(KcnavCooldownError)
   })
 
+  // 同上：四轮 flushIO()+advanceTimersByTimeAsync 比其他用例更容易在慢跑者上吃满默认超时
   it('probe 成功解除熔断并清零等级；再次 401 冷却翻倍且 24h 封顶', async () => {
     const statePath = await newStatePath()
     let mode: 'reject' | 'ok' = 'reject'
@@ -139,7 +143,7 @@ describe('kcnav-transport', () => {
       cooldownLevel: 0,
       cooldownUntil: 0,
     })
-  })
+  }, 20_000)
 
   it('非 401 错误标记 offline 但不熔断', async () => {
     const transport = createKcnavTransport({
